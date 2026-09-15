@@ -186,15 +186,25 @@ contexte — aucun texte n'est abîmé, la correction est seulement omise.
 | ↑ | Flèche vers le haut | U+2191 |
 | ↓ | Flèche vers le bas | U+2193 |
 
-## Affichage des espaces insécables
+## Affichage dans l'éditeur
 
-Les espaces insécable et fine insécable sont encadrées d'un fond coloré dans la
-fenêtre d'édition (Live Preview et mode Source), avec une couleur différente
-pour chacune, afin de les distinguer d'une espace normale. L'affichage est
-purement visuel : le texte du document n'est pas modifié.
+Deux mises en évidence, purement visuelles — le texte du document n'est jamais
+modifié — activables séparément dans **Réglages → Insert Special Characters** :
 
-Cette mise en évidence peut être désactivée dans **Réglages → Insert Special
-Characters**.
+- **Les espaces insécables** sont encadrées d'un fond coloré, une couleur pour
+  chacune, afin de les distinguer d'une espace normale.
+- **Les espaces fautives** sont soulignées d'un trait ondulé rouge, à la
+  manière d'un correcteur orthographique : là où le français impose une
+  insécable (avant `;` `!` `?` `%` `:` et à l'intérieur des guillemets
+  français), une espace ordinaire autorise un retour à la ligne devant la
+  ponctuation — c'est le défaut réel. Une insécable déjà présente, fine ou non,
+  n'est donc jamais signalée. La commande de correction typographique ci-dessus
+  les remplace d'un coup.
+
+Le signalement ignore les mêmes zones que la correction : code, formules,
+liens, URL et intégrations. Une limite connue : dans un bloc de code dont
+l'ouverture ``` se trouve au-dessus de la partie visible de la note, les
+espaces peuvent être signalées à tort — l'affichage seul est concerné.
 
 ## Installation manuelle
 

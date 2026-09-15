@@ -103,3 +103,12 @@
 .special-char-visible-nnbsp {
 	background-color: rgba(52, 152, 219, 0.28);
 }
+
+/* Espace sécable là où le français impose une insécable : le soulignement
+   ondulé reprend la convention du correcteur orthographique, et se distingue
+   ainsi du fond coloré qui signale, lui, une espace correcte mais invisible. */
+.special-char-wrong-space {
+	text-decoration: underline wavy var(--text-error, #e93147);
+	text-decoration-skip-ink: none;
+	text-underline-offset: 2px;
+}

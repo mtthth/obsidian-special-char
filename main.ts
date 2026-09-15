@@ -242,27 +242,78 @@ function fixPunctuation(chunk: string): string {
 	return fixed;
 }
 
-function applyTypography(text: string): string {
-	let result = "";
-	let lastIndex = 0;
+function protectedRanges(text: string): [number, number][] {
+	const ranges: [number, number][] = [];
 
 	PROTECTED_RE.lastIndex = 0;
 	let match: RegExpExecArray | null;
 	while ((match = PROTECTED_RE.exec(text)) !== null) {
-		result += fixPunctuation(text.slice(lastIndex, match.index)) + match[0];
-		lastIndex = match.index + match[0].length;
+		ranges.push([match.index, match.index + match[0].length]);
+	}
+
+	return ranges;
+}
+
+function applyTypography(text: string): string {
+	let result = "";
+	let lastIndex = 0;
+
+	for (const [start, end] of protectedRanges(text)) {
+		result += fixPunctuation(text.slice(lastIndex, start)) + text.slice(start, end);
+		lastIndex = end;
 	}
 
 	return result + fixPunctuation(text.slice(lastIndex));
 }
 
+// Espaces sécables là où le français impose une insécable. On ne signale que
+// l'espace ordinaire (ou la tabulation) : c'est elle qui autorise un retour à
+// la ligne avant la ponctuation, ce qui est le défaut réel. Une insécable déjà
+// présente, fine ou non, n'est jamais signalée.
+const WRONG_SPACE_PATTERNS: RegExp[] = [
+	// Avant ; ! ? — un « ! » suivi de « [ » ouvre une image ou une intégration.
+	/[ \t]+(?=[;?]|!(?!\[))/g,
+	// Avant le % d'un pourcentage.
+	/(?<=\d)[ \t]+(?=%)/g,
+	// Avant un deux-points qui termine un mot : 12:30 ou key::value, sans
+	// espace avant, ne sont pas concernés.
+	/[ \t]+(?=:(?:[ \t]|$))/gm,
+	// À l'intérieur des guillemets français.
+	/(?<=«)[ \t]+/g,
+	/[ \t]+(?=»)/g,
+];
+
+function findWrongSpaces(text: string): [number, number][] {
+	const protectedSpans = protectedRanges(text);
+	const found: [number, number][] = [];
+
+	for (const pattern of WRONG_SPACE_PATTERNS) {
+		pattern.lastIndex = 0;
+		let match: RegExpExecArray | null;
+		while ((match = pattern.exec(text)) !== null) {
+			const start = match.index;
+			const end = start + match[0].length;
+			if (!protectedSpans.some(([s, e]) => start < e && end > s)) {
+				found.push([start, end]);
+			}
+		}
+	}
+
+	// Une même espace peut satisfaire deux motifs (« ; ) : on ne la garde
+	// qu'une fois, et triée, comme l'exige la construction des décorations.
+	found.sort((a, b) => a[0] - b[0]);
+	return found.filter(([start], index) => index === 0 || start !== found[index - 1][0]);
+}
+
 interface SpecialCharPluginSettings {
 	showInvisibleSpaces: boolean;
+	flagWrongSpaces: boolean;
 	recentChars: string[];
 }
 
 const DEFAULT_SETTINGS: SpecialCharPluginSettings = {
 	showInvisibleSpaces: true,
+	flagWrongSpaces: true,
 	recentChars: [],
 };
 
@@ -276,42 +327,64 @@ const INVISIBLE_SPACE_CLASSES: Record<string, string> = {
 	[NNBSP]: "special-char-visible-nnbsp",
 };
 
-function buildInvisibleSpaceDecorations(view: EditorView): DecorationSet {
-	const builder = new RangeSetBuilder<Decoration>();
+type PushRange = (from: number, to: number, cls: string) => void;
+
+function collectInvisibleSpaces(view: EditorView, push: PushRange) {
 	for (const { from, to } of view.visibleRanges) {
 		const text = view.state.doc.sliceString(from, to);
 		for (let i = 0; i < text.length; i++) {
 			const cls = INVISIBLE_SPACE_CLASSES[text[i]];
 			if (cls) {
-				const pos = from + i;
-				builder.add(pos, pos + 1, Decoration.mark({ class: cls }));
+				push(from + i, from + i + 1, cls);
 			}
 		}
 	}
-	return builder.finish();
 }
 
-// Décore les espaces insécable et fine insécable dans la fenêtre d'édition
-// (Live Preview et Source) sans toucher au texte lui-même : un simple encadré
-// visuel, purement cosmétique, appliqué via une mark decoration CodeMirror 6.
-const invisibleSpacesViewPlugin = ViewPlugin.fromClass(
-	class {
-		decorations: DecorationSet;
+function collectWrongSpaces(view: EditorView, push: PushRange) {
+	for (const range of view.visibleRanges) {
+		// Élargi aux lignes entières : un motif coupé par la limite de la zone
+		// visible ne serait pas reconnu.
+		const from = view.state.doc.lineAt(range.from).from;
+		const to = view.state.doc.lineAt(range.to).to;
 
-		constructor(view: EditorView) {
-			this.decorations = buildInvisibleSpaceDecorations(view);
+		for (const [start, end] of findWrongSpaces(view.state.doc.sliceString(from, to))) {
+			push(from + start, from + end, "special-char-wrong-space");
 		}
-
-		update(update: ViewUpdate) {
-			if (update.docChanged || update.viewportChanged) {
-				this.decorations = buildInvisibleSpaceDecorations(update.view);
-			}
-		}
-	},
-	{
-		decorations: (plugin) => plugin.decorations,
 	}
-);
+}
+
+// Décore la fenêtre d'édition (Live Preview et Source) sans toucher au texte
+// lui-même : purement visuel, via des mark decorations CodeMirror 6.
+function decorationPlugin(collect: (view: EditorView, push: PushRange) => void) {
+	const build = (view: EditorView): DecorationSet => {
+		const builder = new RangeSetBuilder<Decoration>();
+		collect(view, (from, to, cls) => builder.add(from, to, Decoration.mark({ class: cls })));
+		return builder.finish();
+	};
+
+	return ViewPlugin.fromClass(
+		class {
+			decorations: DecorationSet;
+
+			constructor(view: EditorView) {
+				this.decorations = build(view);
+			}
+
+			update(update: ViewUpdate) {
+				if (update.docChanged || update.viewportChanged) {
+					this.decorations = build(update.view);
+				}
+			}
+		},
+		{
+			decorations: (plugin) => plugin.decorations,
+		}
+	);
+}
+
+const invisibleSpacesViewPlugin = decorationPlugin(collectInvisibleSpaces);
+const wrongSpacesViewPlugin = decorationPlugin(collectWrongSpaces);
 
 export default class SpecialCharactersPlugin extends Plugin {
 	settings: SpecialCharPluginSettings;
@@ -324,7 +397,7 @@ export default class SpecialCharactersPlugin extends Plugin {
 		await this.loadSettings();
 
 		this.registerEditorExtension(this.editorExtensions);
-		this.applyInvisibleSpacesSetting();
+		this.applyEditorDecorations();
 
 		this.addSettingTab(new SpecialCharSettingTab(this.app, this));
 
@@ -426,12 +499,15 @@ export default class SpecialCharactersPlugin extends Plugin {
 		void this.saveSettings();
 	}
 
-	// Applique le réglage à toutes les fenêtres d'édition, sans recharger le
-	// plugin.
-	applyInvisibleSpacesSetting() {
+	// Applique les réglages d'affichage à toutes les fenêtres d'édition, sans
+	// recharger le plugin.
+	applyEditorDecorations() {
 		this.editorExtensions.length = 0;
 		if (this.settings.showInvisibleSpaces) {
 			this.editorExtensions.push(invisibleSpacesViewPlugin);
+		}
+		if (this.settings.flagWrongSpaces) {
+			this.editorExtensions.push(wrongSpacesViewPlugin);
 		}
 		this.app.workspace.updateOptions();
 	}
@@ -458,7 +534,20 @@ class SpecialCharSettingTab extends PluginSettingTab {
 				toggle.setValue(this.plugin.settings.showInvisibleSpaces).onChange(async (value) => {
 					this.plugin.settings.showInvisibleSpaces = value;
 					await this.plugin.saveSettings();
-					this.plugin.applyInvisibleSpacesSetting();
+					this.plugin.applyEditorDecorations();
+				})
+			);
+
+		new Setting(containerEl)
+			.setName("Signaler les espaces fautives")
+			.setDesc(
+				"Souligne en rouge une espace ordinaire là où le français impose une insécable (avant ; ! ? % :, et à l'intérieur des guillemets français). La commande « Corriger la typographie de la sélection » les remplace."
+			)
+			.addToggle((toggle) =>
+				toggle.setValue(this.plugin.settings.flagWrongSpaces).onChange(async (value) => {
+					this.plugin.settings.flagWrongSpaces = value;
+					await this.plugin.saveSettings();
+					this.plugin.applyEditorDecorations();
 				})
 			);
 	}
