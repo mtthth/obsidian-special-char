@@ -1,4 +1,6 @@
-import { App, Editor, Modal, Notice, Plugin } from "obsidian";
+import { App, Editor, MarkdownView, Modal, Notice, Plugin, PluginSettingTab, Setting } from "obsidian";
+import { Compartment, RangeSetBuilder } from "@codemirror/state";
+import { Decoration, DecorationSet, EditorView, ViewPlugin, ViewUpdate } from "@codemirror/view";
 
 interface SpecialChar {
 	id: string;
@@ -8,6 +10,10 @@ interface SpecialChar {
 }
 
 // Caractères typographiques français difficiles à taper au clavier standard.
+// Note : les champs `char`/`preview` de narrow-nbsp et nbsp contiennent de
+// véritables caractères espace insécable / fine insécable (U+00A0, U+202F),
+// donc invisibles à l'œil nu dans un éditeur de code — ne pas les remplacer
+// par une espace normale lors d'une future modification de ce fichier.
 const SPECIAL_CHARS: SpecialChar[] = [
 	{
 		id: "narrow-nbsp",
@@ -51,8 +57,72 @@ function insertSpecialChar(editor: Editor, char: string) {
 	editor.focus();
 }
 
+interface SpecialCharPluginSettings {
+	showInvisibleSpaces: boolean;
+}
+
+const DEFAULT_SETTINGS: SpecialCharPluginSettings = {
+	showInvisibleSpaces: true,
+};
+
+// Classes CSS appliquées, dans l'éditeur, aux espaces normalement invisibles.
+const INVISIBLE_SPACE_CLASSES: Record<string, string> = {
+	" ": "special-char-visible-nbsp",
+	" ": "special-char-visible-nnbsp",
+};
+
+function buildInvisibleSpaceDecorations(view: EditorView): DecorationSet {
+	const builder = new RangeSetBuilder<Decoration>();
+	for (const { from, to } of view.visibleRanges) {
+		const text = view.state.doc.sliceString(from, to);
+		for (let i = 0; i < text.length; i++) {
+			const cls = INVISIBLE_SPACE_CLASSES[text[i]];
+			if (cls) {
+				const pos = from + i;
+				builder.add(pos, pos + 1, Decoration.mark({ class: cls }));
+			}
+		}
+	}
+	return builder.finish();
+}
+
+// Décore les espaces insécable et fine insécable dans la fenêtre d'édition
+// (Live Preview et Source) sans toucher au texte lui-même : un simple encadré
+// visuel, purement cosmétique, appliqué via une mark decoration CodeMirror 6.
+const invisibleSpacesViewPlugin = ViewPlugin.fromClass(
+	class {
+		decorations: DecorationSet;
+
+		constructor(view: EditorView) {
+			this.decorations = buildInvisibleSpaceDecorations(view);
+		}
+
+		update(update: ViewUpdate) {
+			if (update.docChanged || update.viewportChanged) {
+				this.decorations = buildInvisibleSpaceDecorations(update.view);
+			}
+		}
+	},
+	{
+		decorations: (plugin) => plugin.decorations,
+	}
+);
+
 export default class SpecialCharactersPlugin extends Plugin {
+	settings: SpecialCharPluginSettings;
+	private invisibleSpacesCompartment = new Compartment();
+
 	async onload() {
+		await this.loadSettings();
+
+		this.registerEditorExtension(
+			this.invisibleSpacesCompartment.of(
+				this.settings.showInvisibleSpaces ? invisibleSpacesViewPlugin : []
+			)
+		);
+
+		this.addSettingTab(new SpecialCharSettingTab(this.app, this));
+
 		this.addCommand({
 			id: "open-special-characters-picker",
 			name: "Insérer un caractère spécial (fenêtre)",
@@ -97,6 +167,55 @@ export default class SpecialCharactersPlugin extends Plugin {
 			return;
 		}
 		new SpecialCharacterModal(this.app, editor).open();
+	}
+
+	async loadSettings() {
+		this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData());
+	}
+
+	async saveSettings() {
+		await this.saveData(this.settings);
+	}
+
+	// Reconfigure l'extension CodeMirror sur toutes les fenêtres d'édition
+	// déjà ouvertes (fenêtre principale et éventuelles fenêtres détachées),
+	// sans avoir besoin de recharger le plugin.
+	refreshInvisibleSpacesExtension() {
+		const extension = this.settings.showInvisibleSpaces ? invisibleSpacesViewPlugin : [];
+		this.app.workspace.iterateAllLeaves((leaf) => {
+			const view = leaf.view;
+			if (view instanceof MarkdownView) {
+				const cm = (view.editor as unknown as { cm?: EditorView }).cm;
+				cm?.dispatch({ effects: this.invisibleSpacesCompartment.reconfigure(extension) });
+			}
+		});
+	}
+}
+
+class SpecialCharSettingTab extends PluginSettingTab {
+	private plugin: SpecialCharactersPlugin;
+
+	constructor(app: App, plugin: SpecialCharactersPlugin) {
+		super(app, plugin);
+		this.plugin = plugin;
+	}
+
+	display(): void {
+		const { containerEl } = this;
+		containerEl.empty();
+
+		new Setting(containerEl)
+			.setName("Afficher les espaces insécables dans l'éditeur")
+			.setDesc(
+				"Encadre visuellement les espaces insécable et fine insécable (U+00A0, U+202F) dans la fenêtre d'édition, pour les distinguer des espaces normales."
+			)
+			.addToggle((toggle) =>
+				toggle.setValue(this.plugin.settings.showInvisibleSpaces).onChange(async (value) => {
+					this.plugin.settings.showInvisibleSpaces = value;
+					await this.plugin.saveSettings();
+					this.plugin.refreshInvisibleSpacesExtension();
+				})
+			);
 	}
 }
 

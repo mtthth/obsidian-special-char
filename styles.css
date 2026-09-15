@@ -89,3 +89,19 @@
 		min-height: 84px;
 	}
 }
+
+/* Mise en évidence, dans la fenêtre d'édition, des espaces normalement
+   invisibles (voir Réglages → Insert Special Characters). */
+.special-char-visible-nbsp,
+.special-char-visible-nnbsp {
+	border-radius: 2px;
+	box-shadow: 0 0 0 1px var(--background-modifier-border) inset;
+}
+
+.special-char-visible-nbsp {
+	background-color: rgba(230, 126, 34, 0.28);
+}
+
+.special-char-visible-nnbsp {
+	background-color: rgba(52, 152, 219, 0.28);
+}
