@@ -11,14 +11,22 @@ français difficiles à taper au clavier :
 
 ## Utilisation
 
-- Raccourci par défaut : `Ctrl/Cmd + Alt + S` (modifiable dans Réglages →
-  Raccourcis clavier).
-- Icône dans le ruban latéral (utile sur mobile, sans clavier physique).
-- Commande « Insérer un caractère spécial » accessible depuis la palette de
-  commandes.
+Deux façons d'insérer un caractère :
 
-Dans la fenêtre qui s'ouvre, cliquez sur un caractère ou appuyez sur sa
-touche numérique (1 à 4) pour l'insérer au niveau du curseur.
+1. **Raccourci dédié par caractère.** Chacun des quatre caractères a sa
+   propre commande Obsidian, avec un raccourci par défaut, entièrement
+   reconfigurable (ou désactivable) dans Réglages → Raccourcis clavier
+   (rechercher « Insérer : ») :
+   - Espace fine insécable — `Ctrl/Cmd + Alt + 1`
+   - Espace insécable — `Ctrl/Cmd + Alt + 2`
+   - Guillemet ouvrant « — `Ctrl/Cmd + Alt + 3`
+   - Guillemet fermant » — `Ctrl/Cmd + Alt + 4`
+2. **Fenêtre de sélection.** Raccourci `Ctrl/Cmd + Alt + S` (lui aussi
+   reconfigurable), icône dans le ruban latéral (utile sur mobile, sans
+   clavier physique), ou commande « Insérer un caractère spécial
+   (fenêtre) » depuis la palette de commandes. Dans la fenêtre, cliquez sur
+   un caractère ou appuyez sur sa touche numérique (1 à 4) pour l'insérer
+   au niveau du curseur.
 
 ## Installation manuelle
 

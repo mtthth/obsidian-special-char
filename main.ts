@@ -1,6 +1,7 @@
 import { App, Editor, Modal, Notice, Plugin } from "obsidian";
 
 interface SpecialChar {
+	id: string;
 	char: string;
 	label: string;
 	preview: string;
@@ -9,21 +10,25 @@ interface SpecialChar {
 // Caractères typographiques français difficiles à taper au clavier standard.
 const SPECIAL_CHARS: SpecialChar[] = [
 	{
+		id: "narrow-nbsp",
 		char: " ",
 		label: "Espace fine insécable",
 		preview: "A B",
 	},
 	{
+		id: "nbsp",
 		char: " ",
 		label: "Espace insécable",
 		preview: "A B",
 	},
 	{
+		id: "guillemet-ouvrant",
 		char: "«",
 		label: "Guillemet français ouvrant",
 		preview: "«",
 	},
 	{
+		id: "guillemet-fermant",
 		char: "»",
 		label: "Guillemet français fermant",
 		preview: "»",
@@ -35,11 +40,22 @@ function codePointLabel(char: string): string {
 	return "U+" + codePoint.toString(16).toUpperCase().padStart(4, "0");
 }
 
+function insertSpecialChar(editor: Editor, char: string) {
+	if (editor.somethingSelected()) {
+		editor.replaceSelection(char);
+	} else {
+		const cursor = editor.getCursor();
+		editor.replaceRange(char, cursor);
+		editor.setCursor({ line: cursor.line, ch: cursor.ch + char.length });
+	}
+	editor.focus();
+}
+
 export default class SpecialCharactersPlugin extends Plugin {
 	async onload() {
 		this.addCommand({
 			id: "open-special-characters-picker",
-			name: "Insérer un caractère spécial",
+			name: "Insérer un caractère spécial (fenêtre)",
 			hotkeys: [
 				{
 					modifiers: ["Mod", "Alt"],
@@ -51,6 +67,26 @@ export default class SpecialCharactersPlugin extends Plugin {
 
 		this.addRibbonIcon("text-cursor-input", "Insérer un caractère spécial", () => {
 			this.openPicker();
+		});
+
+		// Une commande dédiée par caractère : chacune dispose de son propre
+		// raccourci clavier, configurable individuellement dans Réglages →
+		// Raccourcis clavier (un raccourci par défaut Mod+Alt+<chiffre> est
+		// proposé mais peut être réassigné ou désactivé librement).
+		SPECIAL_CHARS.forEach((item, index) => {
+			this.addCommand({
+				id: `insert-${item.id}`,
+				name: `Insérer : ${item.label} (${codePointLabel(item.char)})`,
+				hotkeys: [
+					{
+						modifiers: ["Mod", "Alt"],
+						key: String(index + 1),
+					},
+				],
+				editorCallback: (editor: Editor) => {
+					insertSpecialChar(editor, item.char);
+				},
+			});
 		});
 	}
 
@@ -79,7 +115,7 @@ class SpecialCharacterModal extends Modal {
 		contentEl.createEl("h2", { text: "Caractères spéciaux" });
 		contentEl.createEl("p", {
 			cls: "special-char-hint",
-			text: "Cliquez sur un caractère, ou pressez sa touche numérique, pour l'insérer.",
+			text: "Cliquez sur un caractère, ou pressez sa touche numérique, pour l'insérer. Chaque caractère dispose aussi de son propre raccourci clavier configurable dans Réglages → Raccourcis clavier.",
 		});
 
 		const list = contentEl.createDiv({ cls: "special-char-list" });
@@ -118,17 +154,8 @@ class SpecialCharacterModal extends Modal {
 	}
 
 	private insertChar(char: string) {
-		const editor = this.editor;
-
-		if (editor.somethingSelected()) {
-			editor.replaceSelection(char);
-		} else {
-			const cursor = editor.getCursor();
-			editor.replaceRange(char, cursor);
-			editor.setCursor({ line: cursor.line, ch: cursor.ch + char.length });
-		}
-
+		insertSpecialChar(this.editor, char);
 		this.close();
-		editor.focus();
+		this.editor.focus();
 	}
 }
