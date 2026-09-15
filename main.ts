@@ -258,11 +258,17 @@ function applyTypography(text: string): string {
 
 interface SpecialCharPluginSettings {
 	showInvisibleSpaces: boolean;
+	recentChars: string[];
 }
 
 const DEFAULT_SETTINGS: SpecialCharPluginSettings = {
 	showInvisibleSpaces: true,
+	recentChars: [],
 };
+
+// Nombre de caractères récents retenus : de quoi remplir une ligne de la
+// palette sur ordinateur, deux sur mobile.
+const RECENT_COUNT = 6;
 
 // Classes CSS appliquées, dans l'éditeur, aux espaces normalement invisibles.
 const INVISIBLE_SPACE_CLASSES: Record<string, string> = {
@@ -349,7 +355,7 @@ export default class SpecialCharactersPlugin extends Plugin {
 				name: `Insérer : ${item.label}`,
 				hotkeys: item.hotkey ? [item.hotkey] : [],
 				editorCallback: (editor: Editor) => {
-					insertSpecialChar(editor, item.char);
+					this.insertChar(editor, item);
 				},
 			});
 		}
@@ -383,15 +389,41 @@ export default class SpecialCharactersPlugin extends Plugin {
 			new Notice("Ouvrez d'abord une note pour insérer un caractère spécial.");
 			return;
 		}
-		new SpecialCharacterModal(this.app, editor).open();
+		new SpecialCharacterModal(this, editor).open();
 	}
 
 	async loadSettings() {
 		this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData());
+		// data.json peut avoir été édité à la main ou abîmé par une synchro.
+		if (!Array.isArray(this.settings.recentChars)) {
+			this.settings.recentChars = [];
+		}
 	}
 
 	async saveSettings() {
 		await this.saveData(this.settings);
+	}
+
+	insertChar(editor: Editor, item: SpecialChar) {
+		insertSpecialChar(editor, item.char);
+		this.recordRecent(item.id);
+	}
+
+	// Les identifiants inconnus sont ignorés : la liste enregistrée peut citer
+	// un caractère retiré depuis.
+	getRecentChars(): SpecialChar[] {
+		return this.settings.recentChars
+			.map((id) => ALL_CHARS.find((item) => item.id === id))
+			.filter((item): item is SpecialChar => item !== undefined);
+	}
+
+	private recordRecent(id: string) {
+		// Insérer plusieurs fois de suite le même caractère n'écrit rien.
+		if (this.settings.recentChars[0] === id) {
+			return;
+		}
+		this.settings.recentChars = [id, ...this.settings.recentChars.filter((x) => x !== id)].slice(0, RECENT_COUNT);
+		void this.saveSettings();
 	}
 
 	// Applique le réglage à toutes les fenêtres d'édition, sans recharger le
@@ -433,13 +465,15 @@ class SpecialCharSettingTab extends PluginSettingTab {
 }
 
 class SpecialCharacterModal extends Modal {
+	private plugin: SpecialCharactersPlugin;
 	private editor: Editor;
 	private searchEl: HTMLInputElement;
 	private resultsEl: HTMLElement;
 	private visibleChars: SpecialChar[] = [];
 
-	constructor(app: App, editor: Editor) {
-		super(app);
+	constructor(plugin: SpecialCharactersPlugin, editor: Editor) {
+		super(plugin.app);
+		this.plugin = plugin;
 		this.editor = editor;
 	}
 
@@ -475,13 +509,23 @@ class SpecialCharacterModal extends Modal {
 		this.contentEl.empty();
 	}
 
+	// Les récents ne s'affichent qu'en l'absence de recherche : pendant un
+	// filtrage, ils feraient apparaître deux fois les mêmes caractères.
+	private groupsToRender(hasQuery: boolean): CharGroup[] {
+		if (hasQuery) {
+			return CHAR_GROUPS;
+		}
+		const recents = this.plugin.getRecentChars();
+		return recents.length > 0 ? [{ category: "Récents", chars: recents }, ...CHAR_GROUPS] : CHAR_GROUPS;
+	}
+
 	private renderResults(query: string) {
 		const normalizedQuery = normalizeForSearch(query.trim());
 
 		this.resultsEl.empty();
 		this.visibleChars = [];
 
-		for (const group of CHAR_GROUPS) {
+		for (const group of this.groupsToRender(normalizedQuery.length > 0)) {
 			const matches = group.chars.filter((item) => matchesQuery(item, group.category, normalizedQuery));
 			if (matches.length === 0) {
 				continue;
@@ -518,7 +562,7 @@ class SpecialCharacterModal extends Modal {
 		button.createDiv({ cls: "special-char-preview", text: item.preview ?? item.char });
 		button.createDiv({ cls: "special-char-label", text: item.label });
 
-		button.addEventListener("click", () => this.insertChar(item.char));
+		button.addEventListener("click", () => this.chooseChar(item));
 	}
 
 	private handleSearchKeydown(evt: KeyboardEvent) {
@@ -526,7 +570,7 @@ class SpecialCharacterModal extends Modal {
 			evt.preventDefault();
 			const first = this.visibleChars[0];
 			if (first) {
-				this.insertChar(first.char);
+				this.chooseChar(first);
 			}
 		} else if (evt.key === "ArrowDown") {
 			evt.preventDefault();
@@ -567,8 +611,8 @@ class SpecialCharacterModal extends Modal {
 		buttons[Math.max(0, Math.min(index, buttons.length - 1))].focus();
 	}
 
-	private insertChar(char: string) {
-		insertSpecialChar(this.editor, char);
+	private chooseChar(item: SpecialChar) {
+		this.plugin.insertChar(this.editor, item);
 		this.close();
 		this.editor.focus();
 	}

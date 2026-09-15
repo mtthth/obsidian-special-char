@@ -19,6 +19,9 @@ Trois façons d'insérer un caractère :
    Au clic ou au doigt, la fenêtre marche aussi bien sur mobile.
 2. **Un raccourci dédié par caractère** — chacun des 43 caractères a sa propre
    commande, à laquelle vous pouvez attribuer le raccourci de votre choix.
+   Les six derniers caractères insérés, au raccourci comme à la palette,
+   réapparaissent dans une section **Récents** en tête de la fenêtre (masquée
+   pendant une recherche, pour ne pas afficher deux fois les mêmes).
 3. **La palette de commandes** ou **l'icône du ruban** (pratique sur mobile).
 
 ## Raccourcis clavier
