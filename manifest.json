@@ -1,0 +1,10 @@
+{
+	"id": "insert-special-characters",
+	"name": "Insert Special Characters",
+	"version": "1.0.0",
+	"minAppVersion": "1.0.0",
+	"description": "Insère rapidement les caractères typographiques français difficiles à taper : espace fine insécable, espace insécable, guillemets « et ».",
+	"author": "matthieu.thomas",
+	"authorUrl": "",
+	"isDesktopOnly": false
+}
