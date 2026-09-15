@@ -140,14 +140,50 @@ function codePointLabel(char: string): string {
 	return "U+" + codePoint.toString(16).toUpperCase().padStart(4, "0");
 }
 
+// Délimiteurs appariés : insérer l'un de ces caractères alors que du texte est
+// sélectionné l'entoure au lieu de l'écraser. L'ouvrant et le fermant donnent
+// la même paire — inutile de se rappeler lequel des deux insérer — et les
+// guillemets français emportent leurs espaces fines insécables.
+const WRAPPING_PAIRS: Record<string, [string, string]> = {
+	"«": [`«${NNBSP}`, `${NNBSP}»`],
+	"»": [`«${NNBSP}`, `${NNBSP}»`],
+	"“": ["“", "”"],
+	"”": ["“", "”"],
+	"‘": ["‘", "’"],
+	"’": ["‘", "’"],
+};
+
+// Entoure la sélection et la laisse sélectionnée, entre les délimiteurs.
+function wrapSelection(editor: Editor, open: string, close: string) {
+	const from = editor.getCursor("from");
+	const to = editor.getCursor("to");
+	const selection = editor.getSelection();
+
+	editor.replaceSelection(open + selection + close);
+
+	// Seule la première ligne de la sélection est décalée par l'insertion de
+	// `open` : sur une sélection multiligne, la position de fin ne bouge pas.
+	editor.setSelection(
+		{ line: from.line, ch: from.ch + open.length },
+		to.line === from.line ? { line: to.line, ch: to.ch + open.length } : to
+	);
+}
+
 function insertSpecialChar(editor: Editor, char: string) {
+	const pair = WRAPPING_PAIRS[char];
+
 	if (editor.somethingSelected()) {
-		editor.replaceSelection(char);
+		if (pair) {
+			wrapSelection(editor, pair[0], pair[1]);
+		} else {
+			editor.replaceSelection(char);
+		}
 	} else {
 		const cursor = editor.getCursor();
 		editor.replaceRange(char, cursor);
 		editor.setCursor({ line: cursor.line, ch: cursor.ch + char.length });
 	}
+
 	editor.focus();
 }
 

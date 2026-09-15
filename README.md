@@ -46,6 +46,24 @@ a besoin pour saisir `@`, `~`, `#`, `{`, `}`, `[`, `]`, `|`, `\`, l'accent grave
 et `€`. Si vous définissez vos propres raccourcis, mieux vaut éviter
 `Ctrl + Alt` pour la même raison.
 
+## Entourer une sélection
+
+Avec du texte sélectionné, insérer un guillemet ou une apostrophe simple
+**entoure** la sélection au lieu de la remplacer. Peu importe que vous insériez
+l'ouvrant ou le fermant : les deux produisent la paire complète. Le texte reste
+sélectionné entre les délimiteurs, et les guillemets français emportent leurs
+espaces fines insécables.
+
+| Sélection | Caractère inséré | Résultat |
+| --- | --- | --- |
+| `bonjour` | « ou » | « bonjour » |
+| `bonjour` | “ ou ” | “bonjour” |
+| `bonjour` | ‘ ou ’ | ‘bonjour’ |
+
+Cela vaut aussi bien pour les raccourcis clavier que pour la fenêtre de
+sélection. Les 37 autres caractères remplacent la sélection, comme n'importe
+quelle frappe.
+
 ## Corriger la typographie d'une sélection
 
 La commande **« Corriger la typographie de la sélection »** applique d'un coup
