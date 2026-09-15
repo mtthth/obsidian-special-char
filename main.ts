@@ -349,13 +349,32 @@ function collectInvisibleSpaces(view: EditorView, push: PushRange) {
 	}
 }
 
-function collectWrongSpaces(view: EditorView, push: PushRange) {
+// Plages visibles élargies aux lignes entières — un motif coupé par la limite
+// de la zone visible ne serait pas reconnu — puis fusionnées. Une même ligne
+// peut en effet apparaître dans deux plages visibles, CodeMirror escamotant des
+// portions des lignes très longues : la scanner deux fois produirait des
+// positions décroissantes, que la construction des décorations rejette par une
+// exception.
+function visibleLineRanges(view: EditorView): { from: number; to: number }[] {
+	const merged: { from: number; to: number }[] = [];
+
 	for (const range of view.visibleRanges) {
-		// Élargi aux lignes entières : un motif coupé par la limite de la zone
-		// visible ne serait pas reconnu.
 		const from = view.state.doc.lineAt(range.from).from;
 		const to = view.state.doc.lineAt(range.to).to;
+		const last = merged[merged.length - 1];
 
+		if (last && from <= last.to) {
+			last.to = Math.max(last.to, to);
+		} else {
+			merged.push({ from, to });
+		}
+	}
+
+	return merged;
+}
+
+function collectWrongSpaces(view: EditorView, push: PushRange) {
+	for (const { from, to } of visibleLineRanges(view)) {
 		for (const [start, end] of findWrongSpaces(view.state.doc.sliceString(from, to))) {
 			push(from + start, from + end, "special-char-wrong-space");
 		}

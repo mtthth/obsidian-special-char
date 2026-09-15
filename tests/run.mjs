@@ -1,3 +1,4 @@
+import { Text } from "@codemirror/state";
 import { readFileSync } from "fs";
 import path from "path";
 import { FakeEditor, check, loadPlugin, report, root, section } from "./harness.mjs";
@@ -212,6 +213,44 @@ wrong("un % seul", "pourcentage sans chiffre devant", []);
 const melange = findWrongSpaces("« Bonjour » ; oui : non 50 % !");
 check("plages triées par position", melange.map(([s]) => s), [...melange.map(([s]) => s)].sort((a, b) => a - b));
 check("tous les cas du mélange sont trouvés", melange.length, 6);
+
+section("Plages visibles de l'éditeur");
+// CodeMirror escamote des portions des lignes très longues : une même ligne
+// peut alors être rendue en deux plages visibles. Élargies aux lignes entières
+// sans être fusionnées, elles feraient repartir les positions en arrière, et
+// RangeSetBuilder lèverait « Ranges must be added sorted ».
+const fakeView = (text, ranges) => ({ visibleRanges: ranges, state: { doc: Text.of(text.split("\n")) } });
+
+const uneLongueLigne = "Bonjour ! " + "x".repeat(60) + " : suite ?";
+check(
+	"deux plages sur une même ligne sont fusionnées",
+	plugin.visibleLineRanges(fakeView(uneLongueLigne, [{ from: 0, to: 5 }, { from: 40, to: 60 }])),
+	[{ from: 0, to: uneLongueLigne.length }]
+);
+check(
+	"deux plages sur des lignes distinctes restent séparées",
+	plugin.visibleLineRanges(fakeView("ligne un\nligne deux\nligne trois", [{ from: 2, to: 4 }, { from: 22, to: 24 }])),
+	[
+		{ from: 0, to: 8 },
+		{ from: 20, to: 31 },
+	]
+);
+check(
+	"une plage qui reprend au bord de la précédente est fusionnée",
+	plugin.visibleLineRanges(fakeView("aa\nbb", [{ from: 0, to: 2 }, { from: 2, to: 4 }])),
+	[{ from: 0, to: 5 }]
+);
+
+const pousses = [];
+plugin.collectWrongSpaces(fakeView(uneLongueLigne, [{ from: 0, to: 5 }, { from: 40, to: 60 }]), (from, to) =>
+	pousses.push([from, to])
+);
+check(
+	"les positions signalées restent croissantes malgré la coupure",
+	pousses.map(([from]) => from),
+	[...pousses.map(([from]) => from)].sort((a, b) => a - b)
+);
+check("et la ligne n'est pas analysée deux fois", pousses.length, new Set(pousses.map(([from]) => from)).size);
 
 section("Caractères récents");
 const byId = (id) => ALL_CHARS.find((c) => c.id === id);

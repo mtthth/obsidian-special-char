@@ -20,6 +20,8 @@ const INTERNALS = [
 	"insertSpecialChar",
 	"applyTypography",
 	"findWrongSpaces",
+	"visibleLineRanges",
+	"collectWrongSpaces",
 ];
 
 export async function loadPlugin() {
@@ -43,7 +45,8 @@ const failures = [];
 
 // Rend visibles, dans les messages d'échec, les caractères qui ne le sont pas.
 export function show(value) {
-	return String(value).replace(/ /g, "⟦fine⟧").replace(/ /g, "⟦insec⟧").replace(/\n/g, "⏎");
+	const text = typeof value === "string" ? value : JSON.stringify(value);
+	return String(text).replace(/ /g, "⟦fine⟧").replace(/ /g, "⟦insec⟧").replace(/\n/g, "⏎");
 }
 
 export function check(name, actual, expected) {
