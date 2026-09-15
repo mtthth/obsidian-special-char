@@ -231,6 +231,21 @@ espaces peuvent être signalées à tort — l'affichage seul est concerné.
 - `npm run dev` : compilation en mode watch.
 - `npm run build` : vérification TypeScript puis build de production.
 - `npm test` : suite de tests, sans dépendance externe ni lancement d'Obsidian.
+- `deploy.ps1` (Windows/PowerShell) : build puis copie `main.js`, `manifest.json`
+  et `styles.css` dans le dossier plugins du vault (chemin réglable via le
+  paramètre `-VaultPluginPath`).
+
+  Si Windows refuse de l'exécuter (« l'exécution de scripts est désactivée sur
+  ce système ») alors que `Get-ExecutionPolicy -List` montre déjà `RemoteSigned`
+  ou plus permissif, le fichier est probablement marqué comme téléchargé
+  depuis Internet (zone Internet apposée par Windows sur les fichiers reçus
+  autrement que par `git clone`/`git pull`, par ex. un `.zip` extrait). Le
+  débloquer suffit :
+
+  ```powershell
+  Get-Item .\deploy.ps1 -Stream Zone.Identifier -ErrorAction SilentlyContinue
+  Unblock-File .\deploy.ps1
+  ```
 
 Les tests recompilent `main.ts` en exposant ses fonctions internes, le module
 `obsidian` étant remplacé par le stub de `tests/obsidian-stub.js`. Ils couvrent
