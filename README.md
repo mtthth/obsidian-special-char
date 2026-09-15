@@ -217,3 +217,12 @@ espaces peuvent être signalées à tort — l'affichage seul est concerné.
 
 - `npm run dev` : compilation en mode watch.
 - `npm run build` : vérification TypeScript puis build de production.
+- `npm test` : suite de tests, sans dépendance externe ni lancement d'Obsidian.
+
+Les tests recompilent `main.ts` en exposant ses fonctions internes, le module
+`obsidian` étant remplacé par le stub de `tests/obsidian-stub.js`. Ils couvrent
+la table des caractères (chaque point de code est comparé à une valeur attendue
+écrite indépendamment, plusieurs de ces caractères étant indiscernables à
+l'œil), la recherche, la correction typographique, l'entourage de la sélection,
+le signalement des espaces fautives, les caractères récents, ainsi que la
+cohérence du README et des classes CSS avec le code.
