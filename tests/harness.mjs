@@ -20,6 +20,7 @@ const INTERNALS = [
 	"insertSpecialChar",
 	"applyTypography",
 	"findWrongSpaces",
+	"findMissingSpaces",
 	"visibleLineRanges",
 	"collectWrongSpaces",
 ];

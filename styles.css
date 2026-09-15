@@ -124,3 +124,20 @@
 	text-decoration-skip-ink: none;
 	text-underline-offset: 2px;
 }
+
+/* Espacement fautif devant ; ! ? % : ou à l'intérieur des guillemets français
+   — espace ordinaire au lieu d'une insécable, ou absente entièrement : un
+   petit repère rouge, en forme de caret (le symbole traditionnel de
+   correction pour signaler un oubli), posé juste avant le signe concerné.
+   Vient s'ajouter, quand l'espace existe mais est du mauvais type, au
+   soulignement ondulé qui marque le caractère lui-même. */
+.special-char-spacing-marker {
+	display: inline-block;
+	width: 0;
+	height: 0;
+	margin: 0 1px;
+	vertical-align: 2px;
+	border-left: 5px solid transparent;
+	border-right: 5px solid transparent;
+	border-bottom: 7px solid var(--text-error, #e93147);
+}

@@ -1,6 +1,6 @@
 import { App, Editor, Hotkey, Modal, Notice, Platform, Plugin, PluginSettingTab, Setting } from "obsidian";
 import { Extension, RangeSetBuilder } from "@codemirror/state";
-import { Decoration, DecorationSet, EditorView, ViewPlugin, ViewUpdate } from "@codemirror/view";
+import { Decoration, DecorationSet, EditorView, ViewPlugin, ViewUpdate, WidgetType } from "@codemirror/view";
 
 interface SpecialChar {
 	id: string;
@@ -200,6 +200,10 @@ const PROTECTED_RE = new RegExp(
 		"\\$[^\\s$][^$\\n]*\\$",
 		"!?\\[\\[[^\\]\\n]*\\]\\]",
 		"!?\\[[^\\]\\n]*\\]\\([^)\\n]*\\)",
+		// Marqueur d'un bloc de citation spécial (callout) : [!NOTE], [!WARNING]-…
+		"\\[!\\w+\\][+-]?",
+		// Entité HTML : &nbsp; &amp; &#39; &#x27;…
+		"&(?:[a-zA-Z]+|#\\d+|#x[0-9a-fA-F]+);",
 		"<[^>\\n]+>",
 		"[a-z][a-z0-9+.-]*:\\/\\/\\S+",
 		"www\\.\\S+",
@@ -276,8 +280,9 @@ const WRONG_SPACE_PATTERNS: RegExp[] = [
 	// Avant le % d'un pourcentage.
 	/(?<=\d)[ \t]+(?=%)/g,
 	// Avant un deux-points qui termine un mot : 12:30 ou key::value, sans
-	// espace avant, ne sont pas concernés.
-	/[ \t]+(?=:(?:[ \t]|$))/gm,
+	// espace avant, ne sont pas concernés. Comme dans TYPO_RULES, un marqueur
+	// d'emphase peut suivre le deux-points (**Note :**).
+	/[ \t]+(?=:(?:[ \t]|[*_]|$))/gm,
 	// À l'intérieur des guillemets français.
 	/(?<=«)[ \t]+/g,
 	/[ \t]+(?=»)/g,
@@ -303,6 +308,52 @@ function findWrongSpaces(text: string): [number, number][] {
 	// qu'une fois, et triée, comme l'exige la construction des décorations.
 	found.sort((a, b) => a[0] - b[0]);
 	return found.filter(([start], index) => index === 0 || start !== found[index - 1][0]);
+}
+
+// Pendant, sans aucune espace, de chaque motif de WRONG_SPACE_PATTERNS : le
+// français impose une insécable à ces mêmes endroits, mais aucun caractère
+// n'existe ici pour la souligner — d'où des motifs de largeur nulle, positionnés
+// exactement là où l'espace manquante devrait être insérée.
+const MISSING_SPACE_PATTERNS: RegExp[] = [
+	// Avant ; ! ? — comme ci-dessus, un « ! » suivi de « [ » ouvre une image ou
+	// une intégration, et un signe qui en suit un autre (« ?! ») n'exige pas sa
+	// propre espace.
+	/(?<=[^\s;!?])(?=[;?]|!(?!\[))/g,
+	// Avant le % d'un pourcentage.
+	/(?<=\d)(?=%)/g,
+	// Avant un deux-points qui termine un mot : 12:30 ou key::value, sans
+	// espace avant ni après, ne sont pas concernés.
+	/(?<=[^\s:])(?=:(?:[ \t]|[*_]|$))/gm,
+	// À l'intérieur des guillemets français.
+	/(?<=«)(?=[^\s])/g,
+	/(?<=[^\s])(?=»)/g,
+];
+
+function findMissingSpaces(text: string): number[] {
+	const protectedSpans = protectedRanges(text);
+	const found: number[] = [];
+
+	for (const pattern of MISSING_SPACE_PATTERNS) {
+		pattern.lastIndex = 0;
+		let match: RegExpExecArray | null;
+		while ((match = pattern.exec(text)) !== null) {
+			const pos = match.index;
+			// `pos <= e`, et non `pos < e` : un signe placé juste après une
+			// portion protégée (par exemple `` `code`! ``) n'est, comme la
+			// correction typographique, jamais signalé faute de contexte.
+			if (!protectedSpans.some(([s, e]) => pos > s && pos <= e)) {
+				found.push(pos);
+			}
+			// Motifs de largeur nulle : `lastIndex` n'avance pas tout seul, il
+			// faut le faire à la main pour ne pas boucler indéfiniment.
+			if (pattern.lastIndex === pos) {
+				pattern.lastIndex++;
+			}
+		}
+	}
+
+	found.sort((a, b) => a - b);
+	return found.filter((pos, index) => index === 0 || pos !== found[index - 1]);
 }
 
 interface CustomChar {
@@ -375,18 +426,71 @@ function visibleLineRanges(view: EditorView): { from: number; to: number }[] {
 
 function collectWrongSpaces(view: EditorView, push: PushRange) {
 	for (const { from, to } of visibleLineRanges(view)) {
-		for (const [start, end] of findWrongSpaces(view.state.doc.sliceString(from, to))) {
-			push(from + start, from + end, "special-char-wrong-space");
+		const text = view.state.doc.sliceString(from, to);
+		const events: [number, number, string][] = [];
+
+		// Une espace fautive reçoit à la fois le soulignement ondulé, sur le
+		// caractère lui-même, et le repère très visible — au même endroit
+		// qu'une espace manquante, juste avant le signe de ponctuation.
+		for (const [start, end] of findWrongSpaces(text)) {
+			events.push([start, end, "special-char-wrong-space"]);
+			events.push([end, end, "special-char-spacing-marker"]);
+		}
+		for (const pos of findMissingSpaces(text)) {
+			events.push([pos, pos, "special-char-spacing-marker"]);
+		}
+
+		// Les deux motifs peuvent s'entremêler dans le texte : les fusionner
+		// triés est indispensable, RangeSetBuilder exigeant des positions
+		// croissantes.
+		events.sort((a, b) => a[0] - b[0] || a[1] - b[1]);
+		for (const [start, end, cls] of events) {
+			push(from + start, from + end, cls);
 		}
 	}
 }
 
+// Marqueur de largeur nulle posé là où une espace insécable manque ou est
+// fautive : contrairement à une classe posée sur un intervalle existant, un
+// widget peut signaler un point du texte qui ne contient aucun caractère à
+// souligner — le seul cas possible quand l'espace manque entièrement.
+class SpacingMarkerWidget extends WidgetType {
+	constructor(private readonly cls: string) {
+		super();
+	}
+
+	toDOM(): HTMLElement {
+		const marker = document.createElement("span");
+		marker.className = this.cls;
+		marker.setAttribute("aria-label", "Espacement fautif : une espace insécable est attendue ici.");
+		marker.title = "Espacement fautif : une espace insécable est attendue ici.";
+		return marker;
+	}
+
+	eq(other: SpacingMarkerWidget): boolean {
+		return other.cls === this.cls;
+	}
+
+	ignoreEvent(): boolean {
+		return true;
+	}
+}
+
 // Décore la fenêtre d'édition (Live Preview et Source) sans toucher au texte
-// lui-même : purement visuel, via des mark decorations CodeMirror 6.
+// lui-même : purement visuel, via des mark et des widget decorations
+// CodeMirror 6. Une plage de largeur nulle (from === to) devient un widget —
+// c'est le seul moyen de marquer une espace absente, qu'aucun caractère ne
+// permet de souligner.
 function decorationPlugin(collect: (view: EditorView, push: PushRange) => void) {
 	const build = (view: EditorView): DecorationSet => {
 		const builder = new RangeSetBuilder<Decoration>();
-		collect(view, (from, to, cls) => builder.add(from, to, Decoration.mark({ class: cls })));
+		collect(view, (from, to, cls) =>
+			builder.add(
+				from,
+				to,
+				from === to ? Decoration.widget({ widget: new SpacingMarkerWidget(cls), side: 1 }) : Decoration.mark({ class: cls })
+			)
+		);
 		return builder.finish();
 	};
 
@@ -585,7 +689,7 @@ class SpecialCharSettingTab extends PluginSettingTab {
 		new Setting(containerEl)
 			.setName("Signaler les espaces fautives")
 			.setDesc(
-				"Souligne en rouge une espace ordinaire là où le français impose une insécable (avant ; ! ? % :, et à l'intérieur des guillemets français). La commande « Corriger la typographie de la sélection » les remplace."
+				"Marque d'un repère rouge très visible chaque endroit où le français impose une insécable et où elle manque, avant ; ! ? % : et à l'intérieur des guillemets français — que l'espace soit d'un type incorrect (soulignée en plus d'un trait ondulé) ou totalement absente. La commande « Corriger la typographie de la sélection » corrige les deux."
 			)
 			.addToggle((toggle) =>
 				toggle.setValue(this.plugin.settings.flagWrongSpaces).onChange(async (value) => {

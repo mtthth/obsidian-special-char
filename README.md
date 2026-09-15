@@ -211,13 +211,21 @@ modifié — activables séparément dans **Réglages → Insert Special Charact
   insécable (avant `;` `!` `?` `%` `:` et à l'intérieur des guillemets
   français), une espace ordinaire autorise un retour à la ligne devant la
   ponctuation — c'est le défaut réel. Une insécable déjà présente, fine ou non,
-  n'est donc jamais signalée. La commande de correction typographique ci-dessus
-  les remplace d'un coup.
+  n'est donc jamais signalée. Un petit repère rouge en forme de caret, très
+  visible, vient s'y ajouter juste avant le signe de ponctuation concerné.
+- **Les espaces manquantes** — quand l'insécable attendue est totalement
+  absente, par exemple `Attention: ici` — n'ont, elles, aucun caractère à
+  souligner : seul ce même repère rouge est posé, exactement à l'endroit où
+  l'espace manque.
+
+La commande de correction typographique ci-dessus corrige les deux d'un coup.
 
 Le signalement ignore les mêmes zones que la correction : code, formules,
-liens, URL et intégrations. Une limite connue : dans un bloc de code dont
-l'ouverture ``` se trouve au-dessus de la partie visible de la note, les
-espaces peuvent être signalées à tort — l'affichage seul est concerné.
+liens, URL et intégrations. Deux limites connues, purement à l'affichage :
+dans un bloc de code dont l'ouverture ``` se trouve au-dessus de la partie
+visible de la note, les espaces peuvent être signalées à tort ; et, comme pour
+la correction, un `!` ou un `?` placé juste après une portion protégée
+(`` `du code` ! ``) n'est pas signalé, faute de contexte.
 
 ## Installation manuelle
 

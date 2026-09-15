@@ -14,6 +14,7 @@ const {
 	insertSpecialChar,
 	applyTypography,
 	findWrongSpaces,
+	findMissingSpaces,
 } = plugin;
 
 // Points de code attendus, écrits indépendamment de main.ts : plusieurs de ces
@@ -145,6 +146,9 @@ unchanged("---\ntitre: Ma note\ntags: a\n---\n", "métadonnées en tête de sél
 unchanged('Il mesure 5" de haut', "guillemet droit non apparié");
 unchanged("mot\n? question", "aucune fusion de lignes");
 unchanged('<span title="a ; b">x</span>', "balise HTML");
+unchanged("> [!NOTE] Attention", "marqueur de callout Obsidian");
+unchanged("> [!WARNING]- Repliable", "callout repliable, avec son suffixe");
+unchanged("Un&nbsp;espace, une&#39;apostrophe, un&#x27;autre", "entités HTML");
 
 section("Correction : idempotence et intégrité");
 const sample = 'Il a dit "bonjour" ; puis : "quoi ?"... l\'ami, à 12:30 sur https://x.fr/?a=1\nEt `du code ;` fin !';
@@ -207,12 +211,38 @@ wrong("voir ![[img.png]]", "espace avant une intégration", []);
 wrong("$a : b$", "formule en ligne protégée", []);
 wrong("[lien](https://x.fr/a?b=1)", "lien markdown protégé", []);
 wrong("un % seul", "pourcentage sans chiffre devant", []);
+wrong("**Note :**", "deux-points suivi d'un marqueur d'emphase", [[6, 7]]);
+wrong("> [!NOTE] Attention", "marqueur de callout protégé", []);
+wrong("Un&nbsp;espace", "entité HTML protégée", []);
 
 // CodeMirror exige des plages triées : un ordre incorrect lèverait une
 // exception à l'affichage.
 const melange = findWrongSpaces("« Bonjour » ; oui : non 50 % !");
 check("plages triées par position", melange.map(([s]) => s), [...melange.map(([s]) => s)].sort((a, b) => a - b));
 check("tous les cas du mélange sont trouvés", melange.length, 6);
+
+section("Signalement des espaces manquantes");
+const missing = (text, name, expected) => check(name, findMissingSpaces(text), expected);
+
+missing("Bonjour!", "aucune espace du tout avant !", [7]);
+missing("Sans espace;ici", "aucune espace avant ;", [11]);
+missing("Quoi?!", "une suite ?! ne réclame qu'une position", [4]);
+missing(`Bonjour${NNBSP}!`, "fine déjà présente : rien à signaler", []);
+missing(`Bonjour${NBSP}!`, "insécable déjà présente : rien à signaler non plus", []);
+missing("Bonjour !", "espace ordinaire déjà présente : ce n'est pas une absence", []);
+missing("50%", "aucune espace avant le pourcentage", [2]);
+missing("un% seul", "pourcentage sans chiffre devant", []);
+missing("Attention: ici", "aucune espace avant le deux-points", [9]);
+missing("«bonjour»", "aucune espace des deux côtés des guillemets", [1, 8]);
+missing("Rendez-vous à 12:30", "heure : aucune espace attendue", []);
+missing("clé:: valeur", "champ Dataview", []);
+missing("C:\\Users\\moi", "chemin Windows", []);
+missing("Bonjour :)", "émoticône", []);
+missing("Du `code;ici` et voilà", "code en ligne protégé", []);
+missing("```\nx=1;\n```", "bloc de code protégé", []);
+missing("`code`!suite", "juste après une portion protégée : omis, comme la correction", []);
+missing("> [!NOTE] Attention", "marqueur de callout : pas de fausse alerte sur son !", []);
+missing("Un&nbsp;espace", "entité HTML : pas de fausse alerte sur son ;", []);
 
 section("Plages visibles de l'éditeur");
 // CodeMirror escamote des portions des lignes très longues : une même ligne
@@ -251,6 +281,17 @@ check(
 	[...pousses.map(([from]) => from)].sort((a, b) => a - b)
 );
 check("et la ligne n'est pas analysée deux fois", pousses.length, new Set(pousses.map(([from]) => from)).size);
+
+const fusionText = "Bonjour!Salut : oui";
+const fusion = [];
+plugin.collectWrongSpaces(fakeView(fusionText, [{ from: 0, to: fusionText.length }]), (from, to, cls) =>
+	fusion.push([from, to, cls])
+);
+check("espace manquante et espace fautive fusionnées, triées par position", fusion, [
+	[fusionText.indexOf("!"), fusionText.indexOf("!"), "special-char-spacing-marker"],
+	[fusionText.indexOf(":") - 1, fusionText.indexOf(":"), "special-char-wrong-space"],
+	[fusionText.indexOf(":"), fusionText.indexOf(":"), "special-char-spacing-marker"],
+]);
 
 section("Caractères récents");
 const byId = (id) => ALL_CHARS.find((c) => c.id === id);
