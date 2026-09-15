@@ -1,5 +1,5 @@
-import { App, Editor, MarkdownView, Modal, Notice, Plugin, PluginSettingTab, Setting } from "obsidian";
-import { Compartment, RangeSetBuilder } from "@codemirror/state";
+import { App, Editor, Modal, Notice, Plugin, PluginSettingTab, Setting } from "obsidian";
+import { Extension, RangeSetBuilder } from "@codemirror/state";
 import { Decoration, DecorationSet, EditorView, ViewPlugin, ViewUpdate } from "@codemirror/view";
 
 interface SpecialChar {
@@ -110,16 +110,16 @@ const invisibleSpacesViewPlugin = ViewPlugin.fromClass(
 
 export default class SpecialCharactersPlugin extends Plugin {
 	settings: SpecialCharPluginSettings;
-	private invisibleSpacesCompartment = new Compartment();
+	// Obsidian conserve une référence sur ce tableau et le relit pour chaque
+	// éditeur, existant comme futur : le modifier puis appeler updateOptions()
+	// est la façon documentée de reconfigurer une extension CodeMirror 6.
+	private editorExtensions: Extension[] = [];
 
 	async onload() {
 		await this.loadSettings();
 
-		this.registerEditorExtension(
-			this.invisibleSpacesCompartment.of(
-				this.settings.showInvisibleSpaces ? invisibleSpacesViewPlugin : []
-			)
-		);
+		this.registerEditorExtension(this.editorExtensions);
+		this.applyInvisibleSpacesSetting();
 
 		this.addSettingTab(new SpecialCharSettingTab(this.app, this));
 
@@ -177,18 +177,14 @@ export default class SpecialCharactersPlugin extends Plugin {
 		await this.saveData(this.settings);
 	}
 
-	// Reconfigure l'extension CodeMirror sur toutes les fenêtres d'édition
-	// déjà ouvertes (fenêtre principale et éventuelles fenêtres détachées),
-	// sans avoir besoin de recharger le plugin.
-	refreshInvisibleSpacesExtension() {
-		const extension = this.settings.showInvisibleSpaces ? invisibleSpacesViewPlugin : [];
-		this.app.workspace.iterateAllLeaves((leaf) => {
-			const view = leaf.view;
-			if (view instanceof MarkdownView) {
-				const cm = (view.editor as unknown as { cm?: EditorView }).cm;
-				cm?.dispatch({ effects: this.invisibleSpacesCompartment.reconfigure(extension) });
-			}
-		});
+	// Applique le réglage à toutes les fenêtres d'édition, sans recharger le
+	// plugin.
+	applyInvisibleSpacesSetting() {
+		this.editorExtensions.length = 0;
+		if (this.settings.showInvisibleSpaces) {
+			this.editorExtensions.push(invisibleSpacesViewPlugin);
+		}
+		this.app.workspace.updateOptions();
 	}
 }
 
@@ -213,7 +209,7 @@ class SpecialCharSettingTab extends PluginSettingTab {
 				toggle.setValue(this.plugin.settings.showInvisibleSpaces).onChange(async (value) => {
 					this.plugin.settings.showInvisibleSpaces = value;
 					await this.plugin.saveSettings();
-					this.plugin.refreshInvisibleSpacesExtension();
+					this.plugin.applyInvisibleSpacesSetting();
 				})
 			);
 	}
