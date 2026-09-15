@@ -305,16 +305,24 @@ function findWrongSpaces(text: string): [number, number][] {
 	return found.filter(([start], index) => index === 0 || start !== found[index - 1][0]);
 }
 
+interface CustomChar {
+	id: string;
+	char: string;
+	label: string;
+}
+
 interface SpecialCharPluginSettings {
 	showInvisibleSpaces: boolean;
 	flagWrongSpaces: boolean;
 	recentChars: string[];
+	customChars: CustomChar[];
 }
 
 const DEFAULT_SETTINGS: SpecialCharPluginSettings = {
 	showInvisibleSpaces: true,
 	flagWrongSpaces: true,
 	recentChars: [],
+	customChars: [],
 };
 
 // Nombre de caractères récents retenus : de quoi remplir une ligne de la
@@ -471,6 +479,22 @@ export default class SpecialCharactersPlugin extends Plugin {
 		if (!Array.isArray(this.settings.recentChars)) {
 			this.settings.recentChars = [];
 		}
+		if (!Array.isArray(this.settings.customChars)) {
+			this.settings.customChars = [];
+		}
+	}
+
+	// Entrées venant de data.json : celles qui sont inutilisables (caractère
+	// vide ou champ d'un autre type) sont écartées plutôt que d'aboutir à un
+	// bouton vide dans la palette. Sans libellé, le point de code fait l'appoint.
+	getCustomChars(): SpecialChar[] {
+		return this.settings.customChars
+			.filter((item) => item && typeof item.id === "string" && typeof item.char === "string" && item.char !== "")
+			.map((item) => ({
+				id: item.id,
+				char: item.char,
+				label: typeof item.label === "string" && item.label !== "" ? item.label : codePointLabel(item.char),
+			}));
 	}
 
 	async saveSettings() {
@@ -483,10 +507,11 @@ export default class SpecialCharactersPlugin extends Plugin {
 	}
 
 	// Les identifiants inconnus sont ignorés : la liste enregistrée peut citer
-	// un caractère retiré depuis.
+	// un caractère personnalisé supprimé depuis.
 	getRecentChars(): SpecialChar[] {
+		const known = [...this.getCustomChars(), ...ALL_CHARS];
 		return this.settings.recentChars
-			.map((id) => ALL_CHARS.find((item) => item.id === id))
+			.map((id) => known.find((item) => item.id === id))
 			.filter((item): item is SpecialChar => item !== undefined);
 	}
 
@@ -550,6 +575,63 @@ class SpecialCharSettingTab extends PluginSettingTab {
 					this.plugin.applyEditorDecorations();
 				})
 			);
+
+		this.displayCustomChars(containerEl);
+	}
+
+	private displayCustomChars(containerEl: HTMLElement) {
+		new Setting(containerEl)
+			.setName("Caractères personnalisés")
+			.setDesc(
+				"Vos propres caractères, affichés en tête de la fenêtre de sélection et trouvés par la recherche. Le nom est facultatif : sans lui, le point de code est utilisé."
+			)
+			.addButton((button) =>
+				button
+					.setButtonText("Ajouter")
+					.setCta()
+					.onClick(async () => {
+						this.plugin.settings.customChars.push({
+							id: `custom-${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`,
+							char: "",
+							label: "",
+						});
+						await this.plugin.saveSettings();
+						this.display();
+					})
+			);
+
+		this.plugin.settings.customChars.forEach((item, index) => {
+			new Setting(containerEl)
+				.setClass("special-char-custom-row")
+				.addText((text) =>
+					text
+						.setPlaceholder("≠")
+						.setValue(item.char)
+						.onChange(async (value) => {
+							item.char = value;
+							await this.plugin.saveSettings();
+						})
+				)
+				.addText((text) =>
+					text
+						.setPlaceholder("Nom (facultatif)")
+						.setValue(item.label)
+						.onChange(async (value) => {
+							item.label = value;
+							await this.plugin.saveSettings();
+						})
+				)
+				.addExtraButton((button) =>
+					button
+						.setIcon("trash")
+						.setTooltip("Supprimer")
+						.onClick(async () => {
+							this.plugin.settings.customChars.splice(index, 1);
+							await this.plugin.saveSettings();
+							this.display();
+						})
+				);
+		});
 	}
 }
 
@@ -598,14 +680,22 @@ class SpecialCharacterModal extends Modal {
 		this.contentEl.empty();
 	}
 
-	// Les récents ne s'affichent qu'en l'absence de recherche : pendant un
-	// filtrage, ils feraient apparaître deux fois les mêmes caractères.
+	// Les caractères personnalisés passent devant la liste intégrée : c'est une
+	// courte liste choisie par l'utilisateur, la reléguer sous 43 entrées la
+	// rendrait inutile. Les récents, eux, ne s'affichent qu'en l'absence de
+	// recherche : pendant un filtrage, ils feraient apparaître deux fois les
+	// mêmes caractères.
 	private groupsToRender(hasQuery: boolean): CharGroup[] {
+		const custom = this.plugin.getCustomChars();
+		const groups =
+			custom.length > 0 ? [{ category: "Personnalisés", chars: custom }, ...CHAR_GROUPS] : CHAR_GROUPS;
+
 		if (hasQuery) {
-			return CHAR_GROUPS;
+			return groups;
 		}
+
 		const recents = this.plugin.getRecentChars();
-		return recents.length > 0 ? [{ category: "Récents", chars: recents }, ...CHAR_GROUPS] : CHAR_GROUPS;
+		return recents.length > 0 ? [{ category: "Récents", chars: recents }, ...groups] : groups;
 	}
 
 	private renderResults(query: string) {

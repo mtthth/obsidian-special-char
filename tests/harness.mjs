@@ -13,6 +13,8 @@ const INTERNALS = [
 	"NBSP",
 	"CHAR_GROUPS",
 	"ALL_CHARS",
+	"DEFAULT_SETTINGS",
+	"SpecialCharacterModal",
 	"normalizeForSearch",
 	"matchesQuery",
 	"insertSpecialChar",

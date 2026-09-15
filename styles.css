@@ -88,6 +88,18 @@
 	}
 }
 
+/* Lignes de saisie des caractères personnalisés : sans libellé à gauche, on
+   rend la place aux deux champs. */
+.special-char-custom-row .setting-item-info {
+	display: none;
+}
+
+.special-char-custom-row .setting-item-control input:first-child {
+	max-width: 4.5em;
+	text-align: center;
+	font-family: var(--font-monospace, monospace);
+}
+
 /* Mise en évidence, dans la fenêtre d'édition, des espaces normalement
    invisibles (voir Réglages → Insert Special Characters). */
 .special-char-visible-nbsp,

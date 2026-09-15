@@ -215,9 +215,11 @@ check("tous les cas du mélange sont trouvés", melange.length, 6);
 
 section("Caractères récents");
 const byId = (id) => ALL_CHARS.find((c) => c.id === id);
+// Les réglages du banc d'essai sont copiés des vrais défauts : un réglage
+// ajouté plus tard ne peut pas manquer ici sans qu'on s'en aperçoive.
 const newPlugin = () => {
 	const instance = new plugin.default();
-	instance.settings = { showInvisibleSpaces: true, flagWrongSpaces: true, recentChars: [] };
+	instance.settings = structuredClone(plugin.DEFAULT_SETTINGS);
 	return instance;
 };
 const insert = (instance, id) => instance.insertChar(new FakeEditor(""), byId(id));
@@ -250,6 +252,53 @@ const obsolete = newPlugin();
 obsolete.settings.recentChars = ["yen", "caractere-supprime", "livre"];
 check("un identifiant inconnu est ignoré", obsolete.getRecentChars().map((c) => c.id), ["yen", "livre"]);
 check("les récents sont rendus dans l'ordre enregistré", obsolete.getRecentChars()[0].char, "¥");
+
+section("Caractères personnalisés");
+const custom = newPlugin();
+custom.settings.customChars = [
+	{ id: "custom-1", char: "≠", label: "Différent de" },
+	{ id: "custom-2", char: "⇒", label: "" },
+	{ id: "custom-3", char: "", label: "Entrée jamais remplie" },
+	{ id: "custom-4", label: "Champ caractère absent" },
+	{ char: "†", label: "Identifiant absent" },
+	null,
+];
+
+check("les entrées inutilisables sont écartées", custom.getCustomChars().map((c) => c.id), ["custom-1", "custom-2"]);
+check("le libellé saisi est conservé", custom.getCustomChars()[0].label, "Différent de");
+check("sans libellé, le point de code sert de nom", custom.getCustomChars()[1].label, "U+21D2");
+
+// Un caractère personnalisé doit se retrouver dans les récents comme un autre.
+custom.insertChar(new FakeEditor(""), custom.getCustomChars()[0]);
+check("un caractère personnalisé est mémorisé dans les récents", custom.settings.recentChars, ["custom-1"]);
+check("et retrouvé à l'affichage des récents", custom.getRecentChars().map((c) => c.char), ["≠"]);
+
+custom.settings.customChars = [];
+check("supprimé, il disparaît des récents sans casser la liste", custom.getRecentChars(), []);
+
+const categories = (instance, hasQuery) =>
+	new plugin.SpecialCharacterModal(instance, new FakeEditor("")).groupsToRender(hasQuery).map((g) => g.category);
+
+const vierge = newPlugin();
+check("sans personnalisés ni récents : la liste intégrée seule", categories(vierge, false)[0], "Espaces");
+
+const garni = newPlugin();
+garni.settings.customChars = [{ id: "custom-1", char: "≠", label: "Différent de" }];
+check("les personnalisés passent devant la liste intégrée", categories(garni, false).slice(0, 2), [
+	"Personnalisés",
+	"Espaces",
+]);
+
+garni.settings.recentChars = ["custom-1"];
+check("ordre complet : récents, personnalisés, puis le reste", categories(garni, false).slice(0, 3), [
+	"Récents",
+	"Personnalisés",
+	"Espaces",
+]);
+check("pendant une recherche, les récents disparaissent mais pas les personnalisés", categories(garni, true).slice(0, 2), [
+	"Personnalisés",
+	"Espaces",
+]);
 
 section("Cohérence du README");
 const readme = readFileSync(path.join(root, "README.md"), "utf8");
@@ -286,13 +335,21 @@ check("aucun raccourci par défaut n'utilise Mod+Alt", source.includes('"Mod", "
 
 section("Classes CSS");
 const styles = readFileSync(path.join(root, "styles.css"), "utf8");
-const used = [...source.matchAll(/cls: "([a-z-]+)"/g)].map((m) => m[1]);
-const decorationClasses = [...source.matchAll(/"(special-char-(?:visible|wrong)-[a-z-]+)"/g)].map((m) => m[1]);
+// Posée sur la fenêtre sans règle associée : elle sert de point d'accroche
+// aux snippets CSS de l'utilisateur.
+const CSS_HOOKS_WITHOUT_RULE = ["special-char-modal"];
+
+const used = [...source.matchAll(/"(special-char-[a-z-]+)"/g)].map((m) => m[1]);
 const defined = new Set([...styles.matchAll(/^\.([a-z-]+)/gm)].map((m) => m[1]));
 
 check(
 	"toute classe posée par le code a une règle CSS",
-	[...new Set([...used, ...decorationClasses])].filter((cls) => !defined.has(cls)),
+	[...new Set(used)].filter((cls) => !defined.has(cls) && !CSS_HOOKS_WITHOUT_RULE.includes(cls)),
+	[]
+);
+check(
+	"toute règle CSS du plugin correspond à une classe posée par le code",
+	[...defined].filter((cls) => cls.startsWith("special-char-") && !used.includes(cls)),
 	[]
 );
 

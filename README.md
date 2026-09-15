@@ -186,6 +186,19 @@ contexte — aucun texte n'est abîmé, la correction est seulement omise.
 | ↑ | Flèche vers le haut | U+2191 |
 | ↓ | Flèche vers le bas | U+2193 |
 
+## Caractères personnalisés
+
+Il manquera toujours le 44ᵉ caractère : ajoutez le vôtre dans **Réglages →
+Insert Special Characters**, avec un nom facultatif (sans lui, le point de code
+sert d'étiquette). Vos caractères apparaissent dans une section
+**Personnalisés** en tête de la fenêtre de sélection, sont trouvés par la
+recherche et comptent parmi les récents, comme les caractères intégrés.
+
+Ils n'ont en revanche pas de commande dédiée, donc pas de raccourci propre :
+une commande ne peut pas être retirée proprement quand vous supprimez une
+entrée. Passez par la fenêtre de sélection, où la recherche les trouve
+immédiatement.
+
 ## Affichage dans l'éditeur
 
 Deux mises en évidence, purement visuelles — le texte du document n'est jamais
