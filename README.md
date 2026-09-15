@@ -46,6 +46,40 @@ a besoin pour saisir `@`, `~`, `#`, `{`, `}`, `[`, `]`, `|`, `\`, l'accent grave
 et `€`. Si vous définissez vos propres raccourcis, mieux vaut éviter
 `Ctrl + Alt` pour la même raison.
 
+## Corriger la typographie d'une sélection
+
+La commande **« Corriger la typographie de la sélection »** applique d'un coup
+les règles d'espacement du français au texte sélectionné. Elle n'a pas de
+raccourci par défaut : attribuez-le dans Réglages → Raccourcis clavier si vous
+l'utilisez souvent. Tout se défait d'un seul `Ctrl + Z`, et la sélection reste
+active après coup — utile, la plupart des corrections étant invisibles.
+
+Règles appliquées :
+
+| Exemple | Correction appliquée |
+| --- | --- |
+| `Bonjour ; ça va ?` | espace fine insécable avant `;` `!` `?` |
+| `Attention : ici` | espace insécable avant `:` |
+| `50 %` | espace fine insécable avant `%` |
+| `« citation »` | espaces fines insécables à l'intérieur des guillemets |
+| `Il a dit "bonjour"` | guillemets droits appariés → « bonjour » |
+| `l'été` | apostrophe typographique `l’été` |
+| `Ah...` | points de suspension `Ah…` |
+| `mot , suite` | espace parasite avant la virgule supprimée |
+
+La commande est **idempotente** : la relancer sur un texte déjà corrigé ne
+change rien, car les espaces insécables existantes sont reconnues.
+
+Elle ne touche jamais : les blocs et portions de code, les formules `$…$`, les
+liens markdown et internes, les images intégrées, les URL, les balises HTML,
+ni le bloc de métadonnées quand la sélection commence par lui. Les cas
+ambigus sont laissés tels quels : `12:30`, `clé:: valeur` (Dataview),
+`C:\dossier`, `:)` et les guillemets droits non appariés (`5"`).
+
+Une limite connue : un `!` ou `?` placé juste après une portion protégée
+(par exemple `` `du code` ! ``) ne reçoit pas son espace fine, faute de
+contexte — aucun texte n'est abîmé, la correction est seulement omise.
+
 ## Caractères disponibles
 
 **Espaces**

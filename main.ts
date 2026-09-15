@@ -21,16 +21,18 @@ interface CharGroup {
 // @ ~ # { } [ ] | ` \ et €.
 const hotkey = (key: string): Hotkey => ({ modifiers: ["Mod", "Shift"], key });
 
-// Note : les champs `char`/`preview` des deux espaces contiennent de véritables
-// caractères espace insécable / fine insécable (U+00A0, U+202F), donc invisibles
-// à l'œil nu dans un éditeur de code — ne pas les remplacer par une espace
-// normale lors d'une future modification de ce fichier.
+// Ces deux constantes contiennent de véritables caractères d'espace, invisibles
+// dans un éditeur de code : les nommer évite d'avoir à les distinguer à l'œil,
+// notamment dans les règles de typographie plus bas.
+const NNBSP = " "; // espace fine insécable
+const NBSP = " "; // espace insécable
+
 const CHAR_GROUPS: CharGroup[] = [
 	{
 		category: "Espaces",
 		chars: [
-			{ id: "narrow-nbsp", char: " ", label: "Espace fine insécable", preview: "A B", hotkey: hotkey("1") },
-			{ id: "nbsp", char: " ", label: "Espace insécable", preview: "A B", hotkey: hotkey("2") },
+			{ id: "narrow-nbsp", char: NNBSP, label: "Espace fine insécable", preview: `A${NNBSP}B`, hotkey: hotkey("1") },
+			{ id: "nbsp", char: NBSP, label: "Espace insécable", preview: `A${NBSP}B`, hotkey: hotkey("2") },
 		],
 	},
 	{
@@ -149,6 +151,75 @@ function insertSpecialChar(editor: Editor, char: string) {
 	editor.focus();
 }
 
+// Portions que la correction typographique ne doit jamais toucher : code,
+// maths, liens, URL. Le premier motif ne s'applique qu'en début de sélection
+// (pas de drapeau `m`) : c'est le bloc de métadonnées, qu'une espace insécable
+// avant « : » casserait.
+const PROTECTED_RE = new RegExp(
+	[
+		"^---\\r?\\n[\\s\\S]*?\\r?\\n---",
+		"```[\\s\\S]*?```",
+		"`[^`\\n]*`",
+		"\\$\\$[\\s\\S]*?\\$\\$",
+		"\\$[^\\s$][^$\\n]*\\$",
+		"!?\\[\\[[^\\]\\n]*\\]\\]",
+		"!?\\[[^\\]\\n]*\\]\\([^)\\n]*\\)",
+		"<[^>\\n]+>",
+		"[a-z][a-z0-9+.-]*:\\/\\/\\S+",
+		"www\\.\\S+",
+	].join("|"),
+	"g"
+);
+
+// Règles de typographie française, appliquées dans cet ordre. Toutes n'avalent
+// que des espaces horizontales ([^\S\r\n], qui couvre aussi les insécables
+// existantes) : une règle ne peut donc jamais fusionner deux lignes, et
+// réappliquer la commande sur un texte déjà correct ne change rien.
+const TYPO_RULES: { pattern: RegExp; replacement: string }[] = [
+	// Guillemets droits appariés sur une même ligne → guillemets français.
+	{ pattern: /"([^"\n]*)"/g, replacement: `«${NNBSP}$1${NNBSP}»` },
+	// Apostrophe droite → apostrophe typographique.
+	{ pattern: /'/g, replacement: "’" },
+	// Trois points → véritables points de suspension.
+	{ pattern: /\.\.\./g, replacement: "…" },
+	// Espace parasite avant une virgule.
+	{ pattern: /[^\S\r\n]+,/g, replacement: "," },
+	// Espace fine insécable avant ; ! ? — les suites comme « ?! » n'en
+	// reçoivent qu'une seule, et un signe en début de ligne est laissé tel quel.
+	{ pattern: /(\S)[^\S\r\n]*([;!?]+)/g, replacement: `$1${NNBSP}$2` },
+	// ... et avant le % d'un pourcentage.
+	{ pattern: /(\d)[^\S\r\n]*%/g, replacement: `$1${NNBSP}%` },
+	// Espace insécable avant un deux-points, uniquement s'il termine un mot et
+	// est suivi d'une espace, d'une fin de ligne ou d'un marqueur d'emphase :
+	// 12:30, key::value, C:\dossier et les URL restent intacts.
+	{ pattern: /([^\s:])[^\S\r\n]*:(?=[^\S\r\n]|[*_]|$)/gm, replacement: `$1${NBSP}:` },
+	// Espaces fines à l'intérieur des guillemets français.
+	{ pattern: /«[^\S\r\n]*(\S)/g, replacement: `«${NNBSP}$1` },
+	{ pattern: /(\S)[^\S\r\n]*»/g, replacement: `$1${NNBSP}»` },
+];
+
+function fixPunctuation(chunk: string): string {
+	let fixed = chunk;
+	for (const { pattern, replacement } of TYPO_RULES) {
+		fixed = fixed.replace(pattern, replacement);
+	}
+	return fixed;
+}
+
+function applyTypography(text: string): string {
+	let result = "";
+	let lastIndex = 0;
+
+	PROTECTED_RE.lastIndex = 0;
+	let match: RegExpExecArray | null;
+	while ((match = PROTECTED_RE.exec(text)) !== null) {
+		result += fixPunctuation(text.slice(lastIndex, match.index)) + match[0];
+		lastIndex = match.index + match[0].length;
+	}
+
+	return result + fixPunctuation(text.slice(lastIndex));
+}
+
 interface SpecialCharPluginSettings {
 	showInvisibleSpaces: boolean;
 }
@@ -159,8 +230,8 @@ const DEFAULT_SETTINGS: SpecialCharPluginSettings = {
 
 // Classes CSS appliquées, dans l'éditeur, aux espaces normalement invisibles.
 const INVISIBLE_SPACE_CLASSES: Record<string, string> = {
-	" ": "special-char-visible-nbsp",
-	" ": "special-char-visible-nnbsp",
+	[NBSP]: "special-char-visible-nbsp",
+	[NNBSP]: "special-char-visible-nnbsp",
 };
 
 function buildInvisibleSpaceDecorations(view: EditorView): DecorationSet {
@@ -226,6 +297,12 @@ export default class SpecialCharactersPlugin extends Plugin {
 			this.openPicker();
 		});
 
+		this.addCommand({
+			id: "fix-typography-in-selection",
+			name: "Corriger la typographie de la sélection",
+			editorCallback: (editor: Editor) => this.fixTypography(editor),
+		});
+
 		// Une commande dédiée par caractère : chacune peut recevoir son propre
 		// raccourci dans Réglages → Raccourcis clavier. Seuls les quatre
 		// caractères les plus courants en ont un par défaut, pour éviter les
@@ -240,6 +317,28 @@ export default class SpecialCharactersPlugin extends Plugin {
 				},
 			});
 		}
+	}
+
+	private fixTypography(editor: Editor) {
+		if (!editor.somethingSelected()) {
+			new Notice("Sélectionnez d'abord le texte à corriger.");
+			return;
+		}
+
+		const selection = editor.getSelection();
+		const corrected = applyTypography(selection);
+		if (corrected === selection) {
+			new Notice("Rien à corriger dans cette sélection.");
+			return;
+		}
+
+		// Un seul replaceSelection : la correction s'annule d'un seul Ctrl+Z.
+		// La sélection est rétablie ensuite, la plupart des corrections étant
+		// des espaces invisibles.
+		const from = editor.getCursor("from");
+		editor.replaceSelection(corrected);
+		editor.setSelection(from, editor.getCursor());
+		new Notice("Typographie corrigée.");
 	}
 
 	private openPicker() {
