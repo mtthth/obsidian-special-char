@@ -246,6 +246,21 @@ signalé, faute de contexte.
 - `npm run dev` : compilation en mode watch.
 - `npm run build` : vérification TypeScript puis build de production.
 - `npm test` : suite de tests, sans dépendance externe ni lancement d'Obsidian.
+- `deploy.ps1` (Windows/PowerShell) : build puis copie `main.js`, `manifest.json`
+  et `styles.css` dans le dossier plugins du vault (chemin réglable via le
+  paramètre `-VaultPluginPath`).
+
+  Si Windows refuse de l'exécuter (« l'exécution de scripts est désactivée sur
+  ce système ») alors que `Get-ExecutionPolicy -List` montre déjà `RemoteSigned`
+  ou plus permissif, le fichier est probablement marqué comme téléchargé
+  depuis Internet (zone Internet apposée par Windows sur les fichiers reçus
+  autrement que par `git clone`/`git pull`, par ex. un `.zip` extrait). Le
+  débloquer suffit :
+
+  ```powershell
+  Get-Item .\deploy.ps1 -Stream Zone.Identifier -ErrorAction SilentlyContinue
+  Unblock-File .\deploy.ps1
+  ```
 
 Le code est réparti par responsabilité : `main.ts` n'assure plus que
 l'orchestration (commandes, réglages, cycle de vie du plugin) et s'appuie sur
