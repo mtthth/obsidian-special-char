@@ -420,8 +420,12 @@ section("Cohérence du README");
 const readme = readFileSync(path.join(root, "README.md"), "utf8");
 // Les invariants qui suivent se vérifient sur le texte des sources : tous les
 // fichiers sont relus, faute de quoi déplacer du code d'un module à l'autre
-// suffirait à leur faire perdre ce qu'ils surveillent, sans rien signaler.
-const MODULES = readdirSync(path.join(root, "src")).map((name) => `src/${name}`);
+// suffirait à leur faire perdre ce qu'ils surveillent, sans rien signaler. La
+// descente est récursive pour la même raison : ranger un module dans un
+// sous-dossier ne doit pas le soustraire aux vérifications.
+const MODULES = readdirSync(path.join(root, "src"), { recursive: true })
+	.map((name) => `src/${name}`.replaceAll("\\", "/"))
+	.filter((file) => file.endsWith(".ts"));
 const source = ["main.ts", ...MODULES].map((file) => readFileSync(path.join(root, file), "utf8")).join("\n");
 const rows = [...readme.matchAll(/^\| (.+?) \| (.+?) \| U\+([0-9A-F]{4}) \|$/gm)];
 
@@ -441,7 +445,7 @@ check(
 // La section « Développement » décrit le rôle de chaque module : un fichier
 // ajouté, renommé ou supprimé sans qu'elle suive y laisserait un chemin mort,
 // ou passerait sous silence un pan entier du plugin.
-const citedModules = [...readme.matchAll(/`(src\/[a-z-]+\.ts)`/g)].map((m) => m[1]);
+const citedModules = [...readme.matchAll(/`(src\/[\w/-]+\.ts)`/g)].map((m) => m[1]);
 check("chaque module de src/ est décrit dans le README", MODULES.filter((m) => !citedModules.includes(m)), []);
 check("chaque module cité par le README existe", citedModules.filter((m) => !MODULES.includes(m)), []);
 check(
