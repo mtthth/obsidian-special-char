@@ -149,6 +149,14 @@ unchanged('<span title="a ; b">x</span>', "balise HTML");
 unchanged("> [!NOTE] Attention", "marqueur de callout Obsidian");
 unchanged("> [!WARNING]- Repliable", "callout repliable, avec son suffixe");
 unchanged("Un&nbsp;espace, une&#39;apostrophe, un&#x27;autre", "entités HTML");
+unchanged("[ref]: https://exemple.fr", "définition de référence");
+unchanged("[^1]: Une note", "définition de note de bas de page");
+unchanged("Voir [ref]\n\n[ref]: https://exemple.fr", "définition de référence en fin de note");
+unchanged("   [ref]: https://exemple.fr", "définition de référence légèrement indentée");
+// Seuls le libellé et son deux-points sont protégés : la protection ne doit pas
+// déborder sur le texte de la note, ni sur ce qui n'est pas en début de ligne.
+typo("[^1]: Une note ; suite", `[^1]: Une note${NNBSP}; suite`, "le texte d'une note reste corrigé");
+typo("Voir [ceci]: cela", `Voir [ceci]${NBSP}: cela`, "hors début de ligne, ce n'est pas une définition");
 
 section("Correction : idempotence et intégrité");
 const sample = 'Il a dit "bonjour" ; puis : "quoi ?"... l\'ami, à 12:30 sur https://x.fr/?a=1\nEt `du code ;` fin !';
@@ -242,6 +250,9 @@ missing("Du `code;ici` et voilà", "code en ligne protégé", []);
 missing("```\nx=1;\n```", "bloc de code protégé", []);
 missing("`code`!suite", "juste après une portion protégée : omis, comme la correction", []);
 missing("> [!NOTE] Attention", "marqueur de callout : pas de fausse alerte sur son !", []);
+missing("[ref]: https://exemple.fr", "définition de référence : aucune espace attendue", []);
+missing("[^1]: Une note", "définition de note : aucune espace attendue", []);
+missing("Voir [ref]\n\n[ref]: https://exemple.fr", "définition de référence en fin de note", []);
 missing("Un&nbsp;espace", "entité HTML : pas de fausse alerte sur son ;", []);
 
 section("Plages visibles de l'éditeur");
@@ -281,6 +292,31 @@ check(
 	[...pousses.map(([from]) => from)].sort((a, b) => a - b)
 );
 check("et la ligne n'est pas analysée deux fois", pousses.length, new Set(pousses.map(([from]) => from)).size);
+
+// Le bloc de métadonnées n'est reconnu qu'en tête du texte analysé : dès qu'il
+// dépasse en haut de l'écran, la tranche visible commence sur « clé: valeur »,
+// que rien ne distingue alors d'une phrase à corriger.
+const noteAvecEnTete = "---\ntitre: Ma note\ntags: a\n---\nBonjour!";
+const marques = (text, ranges) => {
+	const found = [];
+	plugin.collectWrongSpaces(fakeView(text, ranges), (from, to) => found.push([from, to]));
+	return found;
+};
+
+check("métadonnées défilées hors écran : rien n'est signalé", marques(noteAvecEnTete, [{ from: 4, to: 24 }]), []);
+check(
+	"plage à cheval : seul le corps est analysé",
+	marques(noteAvecEnTete, [{ from: 19, to: 35 }]),
+	[[38, 38]]
+);
+check(
+	"et ses positions restent croissantes",
+	marques(noteAvecEnTete, [{ from: 19, to: 35 }]).map(([from]) => from),
+	[...marques(noteAvecEnTete, [{ from: 19, to: 35 }]).map(([from]) => from)].sort((a, b) => a - b)
+);
+// Un « --- » sans fence fermante est une barre horizontale, pas des métadonnées :
+// il ne doit pas faire taire le signalement sur tout le reste de la note.
+check("une barre horizontale ne fait pas taire le reste", marques("---\nBonjour!", [{ from: 0, to: 12 }]), [[11, 11]]);
 
 const fusionText = "Bonjour!Salut : oui";
 const fusion = [];

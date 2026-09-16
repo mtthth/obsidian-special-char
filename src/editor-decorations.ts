@@ -47,9 +47,38 @@ export function visibleLineRanges(view: EditorView): { from: number; to: number 
 	return merged;
 }
 
+// Le bloc de métadonnées est un fait du document entier, pas de la tranche
+// analysée : son motif dans PROTECTED_RE est ancré sur le début du texte reçu,
+// si bien qu'une fois le « --- » ouvrant défilé hors de l'écran, plus rien ne
+// distingue « clé: valeur » d'une phrase à corriger. Sa fin se calcule donc ici,
+// sur le document, une fois par construction des décorations.
+function frontmatterEnd(view: EditorView): number {
+	const doc = view.state.doc;
+
+	if (doc.line(1).text.trimEnd() !== "---") {
+		return 0;
+	}
+	for (let n = 2; n <= doc.lines; n++) {
+		if (doc.line(n).text.trimEnd() === "---") {
+			return doc.line(n).to;
+		}
+	}
+
+	return 0;
+}
+
 export function collectWrongSpaces(view: EditorView, push: PushRange) {
+	const fmEnd = frontmatterEnd(view);
+
 	for (const { from, to } of visibleLineRanges(view)) {
-		const text = view.state.doc.sliceString(from, to);
+		if (to <= fmEnd) {
+			continue;
+		}
+
+		// fmEnd tombe toujours en fin de ligne : la tranche reste alignée sur
+		// des lignes entières, ce dont dépendent les motifs ancrés sur ^ et $.
+		const base = Math.max(from, fmEnd);
+		const text = view.state.doc.sliceString(base, to);
 		const events: [number, number, string][] = [];
 
 		// Une espace fautive reçoit à la fois le soulignement ondulé, sur le
@@ -68,7 +97,7 @@ export function collectWrongSpaces(view: EditorView, push: PushRange) {
 		// croissantes.
 		events.sort((a, b) => a[0] - b[0] || a[1] - b[1]);
 		for (const [start, end, cls] of events) {
-			push(from + start, from + end, cls);
+			push(base + start, base + end, cls);
 		}
 	}
 }

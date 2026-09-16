@@ -13,6 +13,12 @@ const PROTECTED_RE = new RegExp(
 		"\\$[^\\s$][^$\\n]*\\$",
 		"!?\\[\\[[^\\]\\n]*\\]\\]",
 		"!?\\[[^\\]\\n]*\\]\\([^)\\n]*\\)",
+		// Définition de référence « [ref]: url » ou de note de bas de page
+		// « [^1]: texte », reconnue en début de ligne seulement — ailleurs,
+		// « [ceci]: cela » est de la prose ordinaire. Seul le libellé et son
+		// deux-points sont couverts : le texte d'une note reste de la prose, à
+		// corriger comme le reste.
+		"(?<=^|\\n)[ \\t]{0,3}\\[\\^?[^\\]\\n]*\\]:",
 		// Marqueur d'un bloc de citation spécial (callout) : [!NOTE], [!WARNING]-…
 		"\\[!\\w+\\][+-]?",
 		// Entité HTML : &nbsp; &amp; &#39; &#x27;…

@@ -93,13 +93,18 @@ change rien, car les espaces insécables existantes sont reconnues.
 
 Elle ne touche jamais : les blocs et portions de code, les formules `$…$`, les
 liens markdown et internes, les images intégrées, les URL, les balises HTML,
-ni le bloc de métadonnées quand la sélection commence par lui. Les cas
-ambigus sont laissés tels quels : `12:30`, `clé:: valeur` (Dataview),
+les définitions de référence (`[ref]: url`) et de note de bas de page
+(`[^1]: texte`), ni le bloc de métadonnées quand la sélection commence par lui.
+Les cas ambigus sont laissés tels quels : `12:30`, `clé:: valeur` (Dataview),
 `C:\dossier`, `:)` et les guillemets droits non appariés (`5"`).
 
-Une limite connue : un `!` ou `?` placé juste après une portion protégée
+Deux limites connues. Un `!` ou `?` placé juste après une portion protégée
 (par exemple `` `du code` ! ``) ne reçoit pas son espace fine, faute de
-contexte — aucun texte n'est abîmé, la correction est seulement omise.
+contexte — aucun texte n'est abîmé, la correction est seulement omise. Et
+sélectionner l'intérieur d'un bloc de métadonnées *sans* son `---` ouvrant fait
+perdre à la commande le seul indice qui le lui signale : les `clé: valeur`
+reçoivent alors une espace insécable. Sélectionnez le bloc entier, ou évitez de
+lancer la correction dessus.
 
 ## Caractères disponibles
 
@@ -221,11 +226,13 @@ modifié — activables séparément dans **Réglages → Insert Special Charact
 La commande de correction typographique ci-dessus corrige les deux d'un coup.
 
 Le signalement ignore les mêmes zones que la correction : code, formules,
-liens, URL et intégrations. Deux limites connues, purement à l'affichage :
-dans un bloc de code dont l'ouverture ``` se trouve au-dessus de la partie
-visible de la note, les espaces peuvent être signalées à tort ; et, comme pour
-la correction, un `!` ou un `?` placé juste après une portion protégée
-(`` `du code` ! ``) n'est pas signalé, faute de contexte.
+liens, URL et intégrations. Le bloc de métadonnées est reconnu sur la note
+entière, et reste donc ignoré même après avoir défilé hors de l'écran. Deux
+limites connues, purement à l'affichage : dans un bloc de code dont
+l'ouverture ``` se trouve au-dessus de la partie visible de la note, les
+espaces peuvent être signalées à tort ; et, comme pour la correction, un `!` ou
+un `?` placé juste après une portion protégée (`` `du code` ! ``) n'est pas
+signalé, faute de contexte.
 
 ## Installation manuelle
 
