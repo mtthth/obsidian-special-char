@@ -12,13 +12,33 @@ param(
 
 $ErrorActionPreference = "Stop"
 
-npm run build
+# Une destination relative s'entend depuis là où l'utilisateur a lancé le script,
+# pas depuis le dépôt : elle doit être résolue avant de changer de répertoire.
+$VaultPluginPath = [System.IO.Path]::GetFullPath($VaultPluginPath, (Get-Location).Path)
 
-if (-not (Test-Path $VaultPluginPath)) {
-	New-Item -ItemType Directory -Path $VaultPluginPath -Force | Out-Null
+# Le script doit pouvoir être appelé par son chemin absolu depuis n'importe où :
+# sans cela, npm construirait le projet du répertoire courant, et Copy-Item y
+# chercherait les fichiers à déployer.
+Push-Location $PSScriptRoot
+try {
+	npm run build
+
+	# $ErrorActionPreference ne couvre pas les commandes natives : sans ce test,
+	# un build cassé laisserait déployer le main.js de la fois précédente, en
+	# annonçant un succès.
+	if ($LASTEXITCODE -ne 0) {
+		throw "npm run build a échoué (code $LASTEXITCODE) : rien n'a été déployé."
+	}
+
+	if (-not (Test-Path $VaultPluginPath)) {
+		New-Item -ItemType Directory -Path $VaultPluginPath -Force | Out-Null
+	}
+
+	Copy-Item main.js, manifest.json, styles.css -Destination $VaultPluginPath -Force
 }
-
-Copy-Item main.js, manifest.json, styles.css -Destination $VaultPluginPath -Force
+finally {
+	Pop-Location
+}
 
 Write-Host "Plugin déployé dans $VaultPluginPath"
 Write-Host "Recharge Obsidian (palette de commandes -> Reload app without saving) pour voir les changements."
