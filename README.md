@@ -240,8 +240,16 @@ la correction, un `!` ou un `?` placé juste après une portion protégée
 - `npm run build` : vérification TypeScript puis build de production.
 - `npm test` : suite de tests, sans dépendance externe ni lancement d'Obsidian.
 
-Les tests recompilent `main.ts` en exposant ses fonctions internes, le module
-`obsidian` étant remplacé par le stub de `tests/obsidian-stub.js`. Ils couvrent
+Le code est réparti par responsabilité : `main.ts` n'assure plus que
+l'orchestration (commandes, réglages, cycle de vie du plugin) et s'appuie sur
+`src/chars.ts` (table des caractères, recherche, insertion), `src/typography.ts`
+(règles de correction française, détection des espaces fautives et manquantes),
+`src/editor-decorations.ts` (surlignage dans l'éditeur, via CodeMirror),
+`src/settings.ts`, `src/settings-tab.ts` et `src/picker-modal.ts`.
+
+Les tests recompilent ces modules en un bundle exposant leurs fonctions
+internes, le module `obsidian` étant remplacé par le stub de
+`tests/obsidian-stub.js`. Ils couvrent
 la table des caractères (chaque point de code est comparé à une valeur attendue
 écrite indépendamment, plusieurs de ces caractères étant indiscernables à
 l'œil), la recherche, la correction typographique, l'entourage de la sélection,

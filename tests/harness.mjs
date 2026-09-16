@@ -1,37 +1,29 @@
 import esbuild from "esbuild";
-import { mkdirSync, readFileSync } from "fs";
+import { mkdirSync } from "fs";
 import path from "path";
 import { pathToFileURL } from "url";
 
 export const root = path.resolve(import.meta.dirname, "..");
 
-// main.ts n'exporte que la classe du plugin. On en recompile une copie qui
-// expose aussi ses fonctions internes : elles sont pures et constituent
-// l'essentiel de ce qu'il y a à vérifier, sans avoir à lancer Obsidian.
-const INTERNALS = [
-	"NNBSP",
-	"NBSP",
-	"CHAR_GROUPS",
-	"ALL_CHARS",
-	"DEFAULT_SETTINGS",
-	"SpecialCharacterModal",
-	"normalizeForSearch",
-	"matchesQuery",
-	"insertSpecialChar",
-	"applyTypography",
-	"findWrongSpaces",
-	"findMissingSpaces",
-	"visibleLineRanges",
-	"collectWrongSpaces",
-];
+// Entrée synthétique réunissant les modules du plugin en un seul bundle, la
+// classe du plugin en export par défaut. Les tests atteignent ainsi les
+// fonctions internes : elles sont pures et constituent l'essentiel de ce qu'il
+// y a à vérifier, sans avoir à lancer Obsidian.
+const ENTRY = [
+	`export * from "./src/chars";`,
+	`export * from "./src/typography";`,
+	`export * from "./src/settings";`,
+	`export * from "./src/editor-decorations";`,
+	`export * from "./src/picker-modal";`,
+	`export { default } from "./main";`,
+].join("\n");
 
 export async function loadPlugin() {
-	const source = readFileSync(path.join(root, "main.ts"), "utf8") + `\nexport { ${INTERNALS.join(", ")} };\n`;
 	const outfile = path.join(root, "tests", ".tmp", "bundle.mjs");
 	mkdirSync(path.dirname(outfile), { recursive: true });
 
 	await esbuild.build({
-		stdin: { contents: source, resolveDir: root, sourcefile: "main.ts", loader: "ts" },
+		stdin: { contents: ENTRY, resolveDir: root, sourcefile: "tests-entry.ts", loader: "ts" },
 		bundle: true,
 		format: "esm",
 		outfile,

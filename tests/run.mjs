@@ -1,5 +1,5 @@
 import { Text } from "@codemirror/state";
-import { readFileSync } from "fs";
+import { readFileSync, readdirSync } from "fs";
 import path from "path";
 import { FakeEditor, check, loadPlugin, report, root, section } from "./harness.mjs";
 
@@ -382,7 +382,11 @@ check("pendant une recherche, les récents disparaissent mais pas les personnali
 
 section("Cohérence du README");
 const readme = readFileSync(path.join(root, "README.md"), "utf8");
-const source = readFileSync(path.join(root, "main.ts"), "utf8");
+// Les invariants qui suivent se vérifient sur le texte des sources : tous les
+// fichiers sont relus, faute de quoi déplacer du code d'un module à l'autre
+// suffirait à leur faire perdre ce qu'ils surveillent, sans rien signaler.
+const MODULES = readdirSync(path.join(root, "src")).map((name) => `src/${name}`);
+const source = ["main.ts", ...MODULES].map((file) => readFileSync(path.join(root, file), "utf8")).join("\n");
 const rows = [...readme.matchAll(/^\| (.+?) \| (.+?) \| U\+([0-9A-F]{4}) \|$/gm)];
 
 check("tous les caractères sont documentés", rows.length, ALL_CHARS.length);
@@ -397,6 +401,13 @@ check(
 	rows.map(([, , name]) => name).filter((name) => !labels.has(name)),
 	[]
 );
+
+// La section « Développement » décrit le rôle de chaque module : un fichier
+// ajouté, renommé ou supprimé sans qu'elle suive y laisserait un chemin mort,
+// ou passerait sous silence un pan entier du plugin.
+const citedModules = [...readme.matchAll(/`(src\/[a-z-]+\.ts)`/g)].map((m) => m[1]);
+check("chaque module de src/ est décrit dans le README", MODULES.filter((m) => !citedModules.includes(m)), []);
+check("chaque module cité par le README existe", citedModules.filter((m) => !MODULES.includes(m)), []);
 check(
 	"les raccourcis par défaut du code sont ceux annoncés",
 	[...source.matchAll(/hotkey\("([^"]+)"\)/g)].map((m) => m[1]).sort(),
