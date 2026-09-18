@@ -116,22 +116,13 @@
 	background-color: rgba(52, 152, 219, 0.28);
 }
 
-/* Espace sécable là où le français impose une insécable : le soulignement
-   ondulé reprend la convention du correcteur orthographique, et se distingue
-   ainsi du fond coloré qui signale, lui, une espace correcte mais invisible. */
-.special-char-wrong-space {
-	text-decoration: underline wavy var(--text-error, #e93147);
-	text-decoration-skip-ink: none;
-	text-underline-offset: 2px;
-}
-
 /* Espacement fautif devant ; ! ? % : ou à l'intérieur des guillemets français
    — espace ordinaire au lieu d'une insécable, ou absente entièrement : un
    petit repère rouge, en forme de caret (le symbole traditionnel de
    correction pour signaler un oubli), posé contre le signe concerné, du côté
-   où l'insécable est attendue : devant ; ! ? : % », derrière «. Vient
-   s'ajouter, quand l'espace existe mais est du mauvais type, au soulignement
-   ondulé qui marque le caractère lui-même.
+   où l'insécable est attendue : devant ; ! ? : % », derrière «. Il signale
+   seul les deux cas, plus visible qu'un soulignement : le texte montre déjà
+   s'il y a une espace ou non.
 
    Le repère n'occupe aucune largeur dans la ligne : en écartant les
    caractères, il ferait apparaître une espace là même où il en signale

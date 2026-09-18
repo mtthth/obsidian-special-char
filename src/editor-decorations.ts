@@ -1,7 +1,7 @@
 import { RangeSetBuilder } from "@codemirror/state";
 import { Decoration, DecorationSet, EditorView, ViewPlugin, ViewUpdate } from "@codemirror/view";
 import { NBSP, NNBSP } from "./chars";
-import { findFaultySigns, findWrongSpaces, SignSide } from "./typography";
+import { findFaultySigns, SignSide } from "./typography";
 
 // Classes CSS appliquées, dans l'éditeur, aux espaces normalement invisibles.
 const INVISIBLE_SPACE_CLASSES: Record<string, string> = {
@@ -86,24 +86,12 @@ export function collectWrongSpaces(view: EditorView, push: PushRange) {
 		// des lignes entières, ce dont dépendent les motifs ancrés sur ^ et $.
 		const base = Math.max(from, fmEnd);
 		const text = view.state.doc.sliceString(base, to);
-		const events: [number, number, string][] = [];
 
-		// L'espace ordinaire fautive est soulignée d'un trait ondulé. Le repère,
-		// lui, est posé sur le signe dont l'espacement est fautif, du côté où
-		// l'insécable est attendue — que l'espace soit ordinaire ou absente.
-		for (const [start, end] of findWrongSpaces(text)) {
-			events.push([start, end, "special-char-wrong-space"]);
-		}
+		// Le repère est posé sur le signe dont l'espacement est fautif, du côté
+		// où l'insécable est attendue — que l'espace soit ordinaire ou absente.
+		// findFaultySigns rend les signes triés, comme l'exige RangeSetBuilder.
 		for (const [sign, side] of findFaultySigns(text)) {
-			events.push([sign, sign + 1, SPACING_MARKER_CLASSES[side]]);
-		}
-
-		// Les deux listes peuvent s'entremêler dans le texte : les fusionner
-		// triées est indispensable, RangeSetBuilder exigeant des positions
-		// croissantes.
-		events.sort((a, b) => a[0] - b[0] || a[1] - b[1]);
-		for (const [start, end, cls] of events) {
-			push(base + start, base + end, cls);
+			push(base + sign, base + sign + 1, SPACING_MARKER_CLASSES[side]);
 		}
 	}
 }

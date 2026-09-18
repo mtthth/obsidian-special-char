@@ -29,7 +29,7 @@ export class SpecialCharSettingTab extends PluginSettingTab {
 		new Setting(containerEl)
 			.setName("Signaler les espaces fautives")
 			.setDesc(
-				"Marque d'un repère rouge très visible chaque endroit où le français impose une insécable et où elle manque, avant ; ! ? % : et à l'intérieur des guillemets français — que l'espace soit d'un type incorrect (soulignée en plus d'un trait ondulé) ou totalement absente. La commande « Corriger la typographie de la sélection » corrige les deux."
+				"Marque d'un repère rouge très visible chaque endroit où le français impose une insécable et où elle manque, avant ; ! ? % : et à l'intérieur des guillemets français — que l'espace soit d'un type incorrect ou totalement absente. La commande « Corriger la typographie de la sélection » corrige les deux."
 			)
 			.addToggle((toggle) =>
 				toggle.setValue(this.plugin.settings.flagWrongSpaces).onChange(async (value) => {

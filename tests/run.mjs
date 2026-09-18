@@ -379,9 +379,8 @@ plugin.collectWrongSpaces(fakeView(fusionText, [{ from: 0, to: fusionText.length
 );
 // Le repère est une marque posée sur le signe lui-même : aucun widget, dont
 // l'image tampon de CodeMirror permettrait de couper la ligne devant le signe.
-check("espace manquante et espace fautive fusionnées, triées par position", fusion, [
+check("espace manquante et espace fautive : un même repère, triés par position", fusion, [
 	[fusionText.indexOf("!"), fusionText.indexOf("!") + 1, "special-char-spacing-marker-before"],
-	[fusionText.indexOf(":") - 1, fusionText.indexOf(":"), "special-char-wrong-space"],
 	[fusionText.indexOf(":"), fusionText.indexOf(":") + 1, "special-char-spacing-marker-before"],
 ]);
 const guillemetsNus = [];

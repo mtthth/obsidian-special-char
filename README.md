@@ -211,20 +211,15 @@ modifié — activables séparément dans **Réglages → Insert Special Charact
 
 - **Les espaces insécables** sont encadrées d'un fond coloré, une couleur pour
   chacune, afin de les distinguer d'une espace normale.
-- **Les espaces fautives** sont soulignées d'un trait ondulé rouge, à la
-  manière d'un correcteur orthographique : là où le français impose une
-  insécable (avant `;` `!` `?` `%` `:` et à l'intérieur des guillemets
-  français), une espace ordinaire autorise un retour à la ligne devant la
-  ponctuation — c'est le défaut réel. Une insécable déjà présente, fine ou non,
-  n'est donc jamais signalée ; une espace ordinaire qui la côtoie l'est, en
-  revanche, puisque la ligne peut toujours se couper sur elle. Un petit repère
-  rouge en forme de caret, très visible, vient s'y ajouter : glissé sous la
-  ligne, contre le signe concerné, du côté où l'insécable est attendue (devant
-  `;` `!` `?` `%` `:` `»`, derrière `«`).
-- **Les espaces manquantes** — quand l'insécable attendue est totalement
-  absente, par exemple `Attention: ici` — n'ont, elles, aucun caractère à
-  souligner : seul ce même repère rouge est posé, exactement à l'endroit où
-  l'espace manque.
+- **Les espacements fautifs** sont marqués d'un petit repère rouge en forme de
+  caret, très visible, glissé sous la ligne contre le signe concerné, du côté
+  où l'insécable est attendue (devant `;` `!` `?` `%` `:` `»`, derrière `«`).
+  Là où le français impose une insécable, il signale deux défauts : une espace
+  ordinaire, qui autorise un retour à la ligne devant la ponctuation — c'est
+  le défaut réel —, ou une espace totalement absente, par exemple
+  `Attention: ici`. Une insécable déjà présente, fine ou non, n'est jamais
+  signalée ; une espace ordinaire qui la côtoie l'est, en revanche, puisque la
+  ligne peut toujours se couper sur elle.
 
 Le repère n'occupe aucune place : le texte n'est ni décalé, ni coupé en fin de
 ligne autrement qu'en son absence.
