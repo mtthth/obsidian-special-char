@@ -127,6 +127,11 @@ typo("l'été", "l’été", "apostrophe typographique");
 typo("Ah...", "Ah…", "points de suspension");
 typo("mot , suite", "mot, suite", "espace parasite avant la virgule");
 typo("50 %", `50${NNBSP}%`, "fine avant le pourcentage");
+// Tout ce que le signalement relève, la correction doit le réécrire : une
+// suite d'espaces mêlant ordinaire et insécable est ramenée à la bonne espace.
+typo(`texte ${NBSP}: suite`, `texte${NBSP}: suite`, "espace ordinaire doublant une insécable");
+typo(`Quoi ${NNBSP}?`, `Quoi${NNBSP}?`, "espace ordinaire doublant une fine");
+typo(`« ${NNBSP}texte${NNBSP} »`, `«${NNBSP}texte${NNBSP}»`, "espaces ordinaires doublant les fines des guillemets");
 
 section("Correction : ce qui doit rester intact");
 unchanged("Rendez-vous à 12:30", "heure");
@@ -222,6 +227,28 @@ wrong("un % seul", "pourcentage sans chiffre devant", []);
 wrong("**Note :**", "deux-points suivi d'un marqueur d'emphase", [[6, 7]]);
 wrong("> [!NOTE] Attention", "marqueur de callout protégé", []);
 wrong("Un&nbsp;espace", "entité HTML protégée", []);
+
+// Une insécable ne rachète pas l'espace ordinaire qui la côtoie : la ligne peut
+// toujours se couper sur cette dernière.
+wrong(`texte ${NBSP}: suite`, "espace ordinaire suivie d'une insécable, avant le deux-points", [[5, 6]]);
+wrong(`texte${NBSP} : suite`, "insécable suivie d'une espace ordinaire, avant le deux-points", [[6, 7]]);
+wrong(`texte ${NBSP} : suite`, "deux espaces ordinaires de part et d'autre d'une insécable", [
+	[5, 6],
+	[7, 8],
+]);
+wrong(`Quoi ${NNBSP}?`, "espace ordinaire et fine avant ?", [[4, 5]]);
+wrong(`Bonjour ${NNBSP}!`, "espace ordinaire et fine avant !", [[7, 8]]);
+wrong(`50 ${NNBSP}%`, "espace ordinaire et fine avant le pourcentage", [[2, 3]]);
+wrong(`« ${NNBSP}texte ${NNBSP}»`, "espaces ordinaires doublant les fines des guillemets", [
+	[1, 2],
+	[8, 9],
+]);
+wrong(`texte${NBSP}: suite`, "insécable seule avant le deux-points : rien à signaler", []);
+wrong(`voir ${NBSP}![[img.png]]`, "espace avant une intégration, même doublée d'une insécable", []);
+// Comme la correction, le signalement ignore une suite d'espaces en début ou en
+// fin de ligne : il n'y a là aucune coupure à empêcher.
+wrong("  ; suite", "espaces en tête de ligne devant ;", []);
+wrong("fin «  \nsuite", "espaces après « en fin de ligne", []);
 
 // CodeMirror exige des plages triées : un ordre incorrect lèverait une
 // exception à l'affichage.

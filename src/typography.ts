@@ -92,19 +92,26 @@ export function applyTypography(text: string): string {
 // Espaces sécables là où le français impose une insécable. On ne signale que
 // l'espace ordinaire (ou la tabulation) : c'est elle qui autorise un retour à
 // la ligne avant la ponctuation, ce qui est le défaut réel. Une insécable déjà
-// présente, fine ou non, n'est jamais signalée.
+// présente, fine ou non, n'est jamais signalée — mais elle ne rachète pas une
+// espace ordinaire qui la côtoie : une espace ordinaire suivie d'une
+// insécable, devant « : », laisse la ligne se couper juste après le mot.
+// Chaque motif cherche donc l'espace ordinaire dans toute la suite d'espaces
+// horizontales ([^\S\r\n], comme dans TYPO_RULES) qui touche le signe, bornée
+// de l'autre côté par un caractère visible de la même ligne : c'est exactement
+// ce que la correction réécrit. En début ou en fin de ligne, il n'y a ni
+// coupure possible ni correction.
 const WRONG_SPACE_PATTERNS: RegExp[] = [
 	// Avant ; ! ? — un « ! » suivi de « [ » ouvre une image ou une intégration.
-	/[ \t]+(?=[;?]|!(?!\[))/g,
+	/(?<=\S[^\S\r\n]*)[ \t]+(?=[^\S\r\n]*(?:[;?]|!(?!\[)))/g,
 	// Avant le % d'un pourcentage.
-	/(?<=\d)[ \t]+(?=%)/g,
+	/(?<=\d[^\S\r\n]*)[ \t]+(?=[^\S\r\n]*%)/g,
 	// Avant un deux-points qui termine un mot : 12:30 ou key::value, sans
 	// espace avant, ne sont pas concernés. Comme dans TYPO_RULES, un marqueur
 	// d'emphase peut suivre le deux-points (**Note :**).
-	/[ \t]+(?=:(?:[ \t]|[*_]|$))/gm,
+	/(?<=[^\s:][^\S\r\n]*)[ \t]+(?=[^\S\r\n]*:(?:[ \t]|[*_]|$))/gm,
 	// À l'intérieur des guillemets français.
-	/(?<=«)[ \t]+/g,
-	/[ \t]+(?=»)/g,
+	/(?<=«[^\S\r\n]*)[ \t]+(?=[^\S\r\n]*\S)/g,
+	/(?<=\S[^\S\r\n]*)[ \t]+(?=[^\S\r\n]*»)/g,
 ];
 
 export function findWrongSpaces(text: string): [number, number][] {
