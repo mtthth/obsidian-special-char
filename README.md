@@ -217,7 +217,9 @@ modifié — activables séparément dans **Réglages → Insert Special Charact
   français), une espace ordinaire autorise un retour à la ligne devant la
   ponctuation — c'est le défaut réel. Une insécable déjà présente, fine ou non,
   n'est donc jamais signalée. Un petit repère rouge en forme de caret, très
-  visible, vient s'y ajouter juste avant le signe de ponctuation concerné.
+  visible, vient s'y ajouter : glissé sous la ligne, pointe juste avant le
+  signe de ponctuation concerné, il n'occupe aucune place et ne décale donc
+  pas le texte.
 - **Les espaces manquantes** — quand l'insécable attendue est totalement
   absente, par exemple `Attention: ici` — n'ont, elles, aucun caractère à
   souligner : seul ce même repère rouge est posé, exactement à l'endroit où
