@@ -216,14 +216,18 @@ modifié — activables séparément dans **Réglages → Insert Special Charact
   insécable (avant `;` `!` `?` `%` `:` et à l'intérieur des guillemets
   français), une espace ordinaire autorise un retour à la ligne devant la
   ponctuation — c'est le défaut réel. Une insécable déjà présente, fine ou non,
-  n'est donc jamais signalée. Un petit repère rouge en forme de caret, très
-  visible, vient s'y ajouter : glissé sous la ligne, pointe juste avant le
-  signe de ponctuation concerné, il n'occupe aucune place et ne décale donc
-  pas le texte.
+  n'est donc jamais signalée ; une espace ordinaire qui la côtoie l'est, en
+  revanche, puisque la ligne peut toujours se couper sur elle. Un petit repère
+  rouge en forme de caret, très visible, vient s'y ajouter : glissé sous la
+  ligne, contre le signe concerné, du côté où l'insécable est attendue (devant
+  `;` `!` `?` `%` `:` `»`, derrière `«`).
 - **Les espaces manquantes** — quand l'insécable attendue est totalement
   absente, par exemple `Attention: ici` — n'ont, elles, aucun caractère à
   souligner : seul ce même repère rouge est posé, exactement à l'endroit où
   l'espace manque.
+
+Le repère n'occupe aucune place : le texte n'est ni décalé, ni coupé en fin de
+ligne autrement qu'en son absence.
 
 La commande de correction typographique ci-dessus corrige les deux d'un coup.
 

@@ -1,7 +1,7 @@
 import { RangeSetBuilder } from "@codemirror/state";
-import { Decoration, DecorationSet, EditorView, ViewPlugin, ViewUpdate, WidgetType } from "@codemirror/view";
+import { Decoration, DecorationSet, EditorView, ViewPlugin, ViewUpdate } from "@codemirror/view";
 import { NBSP, NNBSP } from "./chars";
-import { findMissingSpaces, findWrongSpaces } from "./typography";
+import { findFaultySigns, findWrongSpaces, SignSide } from "./typography";
 
 // Classes CSS appliquées, dans l'éditeur, aux espaces normalement invisibles.
 const INVISIBLE_SPACE_CLASSES: Record<string, string> = {
@@ -67,6 +67,13 @@ function frontmatterEnd(view: EditorView): number {
 	return 0;
 }
 
+// Classe du repère d'espacement fautif, selon le côté du signe où l'insécable
+// est attendue : la feuille de style y dessine le caret.
+const SPACING_MARKER_CLASSES: Record<SignSide, string> = {
+	before: "special-char-spacing-marker-before",
+	after: "special-char-spacing-marker-after",
+};
+
 export function collectWrongSpaces(view: EditorView, push: PushRange) {
 	const fmEnd = frontmatterEnd(view);
 
@@ -81,19 +88,18 @@ export function collectWrongSpaces(view: EditorView, push: PushRange) {
 		const text = view.state.doc.sliceString(base, to);
 		const events: [number, number, string][] = [];
 
-		// Une espace fautive reçoit à la fois le soulignement ondulé, sur le
-		// caractère lui-même, et le repère très visible — au même endroit
-		// qu'une espace manquante, juste avant le signe de ponctuation.
+		// L'espace ordinaire fautive est soulignée d'un trait ondulé. Le repère,
+		// lui, est posé sur le signe dont l'espacement est fautif, du côté où
+		// l'insécable est attendue — que l'espace soit ordinaire ou absente.
 		for (const [start, end] of findWrongSpaces(text)) {
 			events.push([start, end, "special-char-wrong-space"]);
-			events.push([end, end, "special-char-spacing-marker"]);
 		}
-		for (const pos of findMissingSpaces(text)) {
-			events.push([pos, pos, "special-char-spacing-marker"]);
+		for (const [sign, side] of findFaultySigns(text)) {
+			events.push([sign, sign + 1, SPACING_MARKER_CLASSES[side]]);
 		}
 
-		// Les deux motifs peuvent s'entremêler dans le texte : les fusionner
-		// triés est indispensable, RangeSetBuilder exigeant des positions
+		// Les deux listes peuvent s'entremêler dans le texte : les fusionner
+		// triées est indispensable, RangeSetBuilder exigeant des positions
 		// croissantes.
 		events.sort((a, b) => a[0] - b[0] || a[1] - b[1]);
 		for (const [start, end, cls] of events) {
@@ -102,50 +108,26 @@ export function collectWrongSpaces(view: EditorView, push: PushRange) {
 	}
 }
 
-// Marqueur de largeur nulle posé là où une espace insécable manque ou est
-// fautive : contrairement à une classe posée sur un intervalle existant, un
-// widget peut signaler un point du texte qui ne contient aucun caractère à
-// souligner — le seul cas possible quand l'espace manque entièrement.
-class SpacingMarkerWidget extends WidgetType {
-	constructor(private readonly cls: string) {
-		super();
-	}
-
-	toDOM(): HTMLElement {
-		const marker = document.createElement("span");
-		marker.className = this.cls;
-		marker.setAttribute("aria-label", "Espacement fautif : une espace insécable est attendue ici.");
-		marker.title = "Espacement fautif : une espace insécable est attendue ici.";
-		return marker;
-	}
-
-	eq(other: SpacingMarkerWidget): boolean {
-		return other.cls === this.cls;
-	}
-
-	// Le triangle déborde sous les caractères voisins : un clic dessus doit
-	// être traité par l'éditeur comme un clic sur le texte à cet endroit —
-	// placement du curseur, double-clic sur un mot, glisser —, et non
-	// abandonné au navigateur, dont la sélection native diffère de la sienne.
-	ignoreEvent(): boolean {
-		return false;
-	}
-}
+// Info-bulle du repère. Portée par le signe lui-même, elle s'affiche au survol
+// du signe comme du caret dessiné contre lui.
+const SPACING_MARKER_TITLE = { title: "Espacement fautif : une espace insécable est attendue ici." };
+const MARK_ATTRIBUTES: Record<string, { [name: string]: string }> = {
+	[SPACING_MARKER_CLASSES.before]: SPACING_MARKER_TITLE,
+	[SPACING_MARKER_CLASSES.after]: SPACING_MARKER_TITLE,
+};
 
 // Décore la fenêtre d'édition (Live Preview et Source) sans toucher au texte
-// lui-même : purement visuel, via des mark et des widget decorations
-// CodeMirror 6. Une plage de largeur nulle (from === to) devient un widget —
-// c'est le seul moyen de marquer une espace absente, qu'aucun caractère ne
-// permet de souligner.
+// lui-même : purement visuel, par des mark decorations CodeMirror 6. Même le
+// repère d'une espace absente, qu'aucun caractère ne permet de souligner, est
+// une marque — posée sur le signe voisin — et non un widget inséré entre deux
+// caractères : CodeMirror flanque tout widget d'une image tampon, sur laquelle
+// le navigateur peut couper la ligne (« Bonjour » en fin de ligne, « ! » seul
+// au début de la suivante), soit le défaut même que le repère signale.
 function decorationPlugin(collect: (view: EditorView, push: PushRange) => void) {
 	const build = (view: EditorView): DecorationSet => {
 		const builder = new RangeSetBuilder<Decoration>();
 		collect(view, (from, to, cls) =>
-			builder.add(
-				from,
-				to,
-				from === to ? Decoration.widget({ widget: new SpacingMarkerWidget(cls), side: 1 }) : Decoration.mark({ class: cls })
-			)
+			builder.add(from, to, Decoration.mark({ class: cls, attributes: MARK_ATTRIBUTES[cls] }))
 		);
 		return builder.finish();
 	};

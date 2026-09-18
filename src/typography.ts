@@ -89,6 +89,9 @@ export function applyTypography(text: string): string {
 	return result + fixPunctuation(text.slice(lastIndex));
 }
 
+// Côté du signe où l'insécable est attendue : devant ; ! ? : % », derrière «.
+export type SignSide = "before" | "after";
+
 // Espaces sécables là où le français impose une insécable. On ne signale que
 // l'espace ordinaire (ou la tabulation) : c'est elle qui autorise un retour à
 // la ligne avant la ponctuation, ce qui est le défaut réel. Une insécable déjà
@@ -100,35 +103,53 @@ export function applyTypography(text: string): string {
 // de l'autre côté par un caractère visible de la même ligne : c'est exactement
 // ce que la correction réécrit. En début ou en fin de ligne, il n'y a ni
 // coupure possible ni correction.
-const WRONG_SPACE_PATTERNS: RegExp[] = [
+//
+// Le groupe capturé est la part de cette suite qui sépare l'espace fautive du
+// signe : de quoi situer ce dernier, qui porte le repère dans l'éditeur.
+const WRONG_SPACE_PATTERNS: { pattern: RegExp; side: SignSide }[] = [
 	// Avant ; ! ? — un « ! » suivi de « [ » ouvre une image ou une intégration.
-	/(?<=\S[^\S\r\n]*)[ \t]+(?=[^\S\r\n]*(?:[;?]|!(?!\[)))/g,
+	{ pattern: /(?<=\S[^\S\r\n]*)[ \t]+(?=([^\S\r\n]*)(?:[;?]|!(?!\[)))/g, side: "before" },
 	// Avant le % d'un pourcentage.
-	/(?<=\d[^\S\r\n]*)[ \t]+(?=[^\S\r\n]*%)/g,
+	{ pattern: /(?<=\d[^\S\r\n]*)[ \t]+(?=([^\S\r\n]*)%)/g, side: "before" },
 	// Avant un deux-points qui termine un mot : 12:30 ou key::value, sans
 	// espace avant, ne sont pas concernés. Comme dans TYPO_RULES, un marqueur
 	// d'emphase peut suivre le deux-points (**Note :**).
-	/(?<=[^\s:][^\S\r\n]*)[ \t]+(?=[^\S\r\n]*:(?:[ \t]|[*_]|$))/gm,
+	{ pattern: /(?<=[^\s:][^\S\r\n]*)[ \t]+(?=([^\S\r\n]*):(?:[ \t]|[*_]|$))/gm, side: "before" },
 	// À l'intérieur des guillemets français.
-	/(?<=«[^\S\r\n]*)[ \t]+(?=[^\S\r\n]*\S)/g,
-	/(?<=\S[^\S\r\n]*)[ \t]+(?=[^\S\r\n]*»)/g,
+	{ pattern: /(?<=«([^\S\r\n]*))[ \t]+(?=[^\S\r\n]*\S)/g, side: "after" },
+	{ pattern: /(?<=\S[^\S\r\n]*)[ \t]+(?=([^\S\r\n]*)»)/g, side: "before" },
 ];
 
-export function findWrongSpaces(text: string): [number, number][] {
-	const protectedSpans = protectedRanges(text);
-	const found: [number, number][] = [];
+// Une espace ordinaire fautive, et le signe qu'elle sépare de son mot.
+interface WrongSpace {
+	start: number;
+	end: number;
+	sign: number;
+	side: SignSide;
+}
 
-	for (const pattern of WRONG_SPACE_PATTERNS) {
+function matchWrongSpaces(text: string): WrongSpace[] {
+	const protectedSpans = protectedRanges(text);
+	const found: WrongSpace[] = [];
+
+	for (const { pattern, side } of WRONG_SPACE_PATTERNS) {
 		pattern.lastIndex = 0;
 		let match: RegExpExecArray | null;
 		while ((match = pattern.exec(text)) !== null) {
 			const start = match.index;
 			const end = start + match[0].length;
 			if (!protectedSpans.some(([s, e]) => start < e && end > s)) {
-				found.push([start, end]);
+				const gap = match[1].length;
+				found.push({ start, end, side, sign: side === "before" ? end + gap : start - gap - 1 });
 			}
 		}
 	}
+
+	return found;
+}
+
+export function findWrongSpaces(text: string): [number, number][] {
+	const found = matchWrongSpaces(text).map(({ start, end }): [number, number] => [start, end]);
 
 	// Une même espace peut satisfaire deux motifs (« ; ) : on ne la garde
 	// qu'une fois, et triée, comme l'exige la construction des décorations.
@@ -139,27 +160,28 @@ export function findWrongSpaces(text: string): [number, number][] {
 // Pendant, sans aucune espace, de chaque motif de WRONG_SPACE_PATTERNS : le
 // français impose une insécable à ces mêmes endroits, mais aucun caractère
 // n'existe ici pour la souligner — d'où des motifs de largeur nulle, positionnés
-// exactement là où l'espace manquante devrait être insérée.
-const MISSING_SPACE_PATTERNS: RegExp[] = [
+// exactement là où l'espace manquante devrait être insérée. Le signe se trouve
+// juste après cette position (side "before") ou, pour «, juste avant.
+const MISSING_SPACE_PATTERNS: { pattern: RegExp; side: SignSide }[] = [
 	// Avant ; ! ? — comme ci-dessus, un « ! » suivi de « [ » ouvre une image ou
 	// une intégration, et un signe qui en suit un autre (« ?! ») n'exige pas sa
 	// propre espace.
-	/(?<=[^\s;!?])(?=[;?]|!(?!\[))/g,
+	{ pattern: /(?<=[^\s;!?])(?=[;?]|!(?!\[))/g, side: "before" },
 	// Avant le % d'un pourcentage.
-	/(?<=\d)(?=%)/g,
+	{ pattern: /(?<=\d)(?=%)/g, side: "before" },
 	// Avant un deux-points qui termine un mot : 12:30 ou key::value, sans
 	// espace avant ni après, ne sont pas concernés.
-	/(?<=[^\s:])(?=:(?:[ \t]|[*_]|$))/gm,
+	{ pattern: /(?<=[^\s:])(?=:(?:[ \t]|[*_]|$))/gm, side: "before" },
 	// À l'intérieur des guillemets français.
-	/(?<=«)(?=[^\s])/g,
-	/(?<=[^\s])(?=»)/g,
+	{ pattern: /(?<=«)(?=[^\s])/g, side: "after" },
+	{ pattern: /(?<=[^\s])(?=»)/g, side: "before" },
 ];
 
-export function findMissingSpaces(text: string): number[] {
+function matchMissingSpaces(text: string): { pos: number; side: SignSide }[] {
 	const protectedSpans = protectedRanges(text);
-	const found: number[] = [];
+	const found: { pos: number; side: SignSide }[] = [];
 
-	for (const pattern of MISSING_SPACE_PATTERNS) {
+	for (const { pattern, side } of MISSING_SPACE_PATTERNS) {
 		pattern.lastIndex = 0;
 		let match: RegExpExecArray | null;
 		while ((match = pattern.exec(text)) !== null) {
@@ -168,7 +190,7 @@ export function findMissingSpaces(text: string): number[] {
 			// portion protégée (par exemple `` `code`! ``) n'est, comme la
 			// correction typographique, jamais signalé faute de contexte.
 			if (!protectedSpans.some(([s, e]) => pos > s && pos <= e)) {
-				found.push(pos);
+				found.push({ pos, side });
 			}
 			// Motifs de largeur nulle : `lastIndex` n'avance pas tout seul, il
 			// faut le faire à la main pour ne pas boucler indéfiniment.
@@ -178,6 +200,30 @@ export function findMissingSpaces(text: string): number[] {
 		}
 	}
 
+	return found;
+}
+
+export function findMissingSpaces(text: string): number[] {
+	const found = matchMissingSpaces(text).map(({ pos }) => pos);
+
 	found.sort((a, b) => a - b);
 	return found.filter((pos, index) => index === 0 || pos !== found[index - 1]);
+}
+
+// Signes de ponctuation dont l'espacement est fautif — insécable absente, ou
+// doublée d'une espace ordinaire —, triés, chacun avec le côté où l'insécable
+// est attendue. C'est sur eux que l'éditeur pose le repère : un tel signe
+// n'est jamais de la syntaxe que l'aperçu en direct masque, contrairement au
+// caractère qui le précède parfois (l'astérisque de **Note**:).
+export function findFaultySigns(text: string): [number, SignSide][] {
+	const signs = new Map<number, SignSide>();
+
+	for (const { sign, side } of matchWrongSpaces(text)) {
+		signs.set(sign, side);
+	}
+	for (const { pos, side } of matchMissingSpaces(text)) {
+		signs.set(side === "before" ? pos : pos - 1, side);
+	}
+
+	return [...signs].sort((a, b) => a[0] - b[0]);
 }

@@ -15,6 +15,7 @@ const {
 	applyTypography,
 	findWrongSpaces,
 	findMissingSpaces,
+	findFaultySigns,
 } = plugin;
 
 // Points de code attendus, écrits indépendamment de main.ts : plusieurs de ces
@@ -282,6 +283,32 @@ missing("[^1]: Une note", "définition de note : aucune espace attendue", []);
 missing("Voir [ref]\n\n[ref]: https://exemple.fr", "définition de référence en fin de note", []);
 missing("Un&nbsp;espace", "entité HTML : pas de fausse alerte sur son ;", []);
 
+section("Signes portant le repère");
+const signs = (text, name, expected) => check(name, findFaultySigns(text), expected);
+
+signs("Bonjour!", "espace absente : repère devant le signe", [[7, "before"]]);
+signs("Bonjour !", "espace ordinaire : repère sur le même signe", [[8, "before"]]);
+signs(`texte ${NBSP}: suite`, "espace ordinaire doublant une insécable : repère contre le signe", [[7, "before"]]);
+signs("«bonjour»", "guillemets sans espaces : derrière « et devant »", [
+	[0, "after"],
+	[8, "before"],
+]);
+signs("« bonjour »", "guillemets aux espaces ordinaires : mêmes signes", [
+	[0, "after"],
+	[10, "before"],
+]);
+signs(`« ${NNBSP}bonjour`, "espace ordinaire après la fine de « : repère sur « quand même", [[0, "after"]]);
+// Le signe n'est jamais de la syntaxe masquée par l'aperçu en direct, à la
+// différence du caractère qui le précède ici.
+signs("**Note**:", "après un marqueur d'emphase : repère sur le deux-points", [[8, "before"]]);
+signs("« :x", "un deux-points qui ne termine pas un mot ne porte pas de repère", [[0, "after"]]);
+signs("texte;»", "deux signes accolés : un repère chacun", [
+	[5, "before"],
+	[6, "before"],
+]);
+signs(`Bonjour${NNBSP}!`, "espacement correct : aucun repère", []);
+signs("Du `code;ici` et voilà", "code protégé : aucun repère", []);
+
 section("Plages visibles de l'éditeur");
 // CodeMirror escamote des portions des lignes très longues : une même ligne
 // peut alors être rendue en deux plages visibles. Élargies aux lignes entières
@@ -334,7 +361,7 @@ check("métadonnées défilées hors écran : rien n'est signalé", marques(note
 check(
 	"plage à cheval : seul le corps est analysé",
 	marques(noteAvecEnTete, [{ from: 19, to: 35 }]),
-	[[38, 38]]
+	[[38, 39]]
 );
 check(
 	"et ses positions restent croissantes",
@@ -343,17 +370,25 @@ check(
 );
 // Un « --- » sans fence fermante est une barre horizontale, pas des métadonnées :
 // il ne doit pas faire taire le signalement sur tout le reste de la note.
-check("une barre horizontale ne fait pas taire le reste", marques("---\nBonjour!", [{ from: 0, to: 12 }]), [[11, 11]]);
+check("une barre horizontale ne fait pas taire le reste", marques("---\nBonjour!", [{ from: 0, to: 12 }]), [[11, 12]]);
 
 const fusionText = "Bonjour!Salut : oui";
 const fusion = [];
 plugin.collectWrongSpaces(fakeView(fusionText, [{ from: 0, to: fusionText.length }]), (from, to, cls) =>
 	fusion.push([from, to, cls])
 );
+// Le repère est une marque posée sur le signe lui-même : aucun widget, dont
+// l'image tampon de CodeMirror permettrait de couper la ligne devant le signe.
 check("espace manquante et espace fautive fusionnées, triées par position", fusion, [
-	[fusionText.indexOf("!"), fusionText.indexOf("!"), "special-char-spacing-marker"],
+	[fusionText.indexOf("!"), fusionText.indexOf("!") + 1, "special-char-spacing-marker-before"],
 	[fusionText.indexOf(":") - 1, fusionText.indexOf(":"), "special-char-wrong-space"],
-	[fusionText.indexOf(":"), fusionText.indexOf(":"), "special-char-spacing-marker"],
+	[fusionText.indexOf(":"), fusionText.indexOf(":") + 1, "special-char-spacing-marker-before"],
+]);
+const guillemetsNus = [];
+plugin.collectWrongSpaces(fakeView("«mot»", [{ from: 0, to: 5 }]), (from, to, cls) => guillemetsNus.push([from, to, cls]));
+check("derrière « et devant » : un côté par guillemet", guillemetsNus, [
+	[0, 1, "special-char-spacing-marker-after"],
+	[4, 5, "special-char-spacing-marker-before"],
 ]);
 
 section("Caractères récents");
