@@ -123,8 +123,12 @@ class SpacingMarkerWidget extends WidgetType {
 		return other.cls === this.cls;
 	}
 
+	// Le triangle déborde sous les caractères voisins : un clic dessus doit
+	// être traité par l'éditeur comme un clic sur le texte à cet endroit —
+	// placement du curseur, double-clic sur un mot, glisser —, et non
+	// abandonné au navigateur, dont la sélection native diffère de la sienne.
 	ignoreEvent(): boolean {
-		return true;
+		return false;
 	}
 }
 
