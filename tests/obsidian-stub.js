@@ -16,6 +16,15 @@ export class Plugin {
 export class Modal {}
 export class PluginSettingTab {}
 export class Setting {}
-export class Notice {}
+// Consigne chaque message affiché : les tests vérifient ce que l'utilisateur lit.
+export class Notice {
+	static messages = [];
+	static classes = [];
+
+	constructor(message) {
+		Notice.messages.push(message);
+		this.noticeEl = { addClass: (cls) => Notice.classes.push(cls) };
+	}
+}
 
 export const Platform = { isMobile: false };

@@ -67,13 +67,145 @@ Cela vaut aussi bien pour les raccourcis clavier que pour la fenêtre de
 sélection. Les 37 autres caractères remplacent la sélection, comme n'importe
 quelle frappe.
 
+## Langue des notes
+
+Les règles typographiques dépendent de la langue : le français impose une espace
+fine avant `?` et `!`, l'anglais n'en met pas. Le plugin détermine donc la
+langue de chaque **note**, jamais celle d'une sélection, dans cet ordre :
+
+1. **La propriété de la note** — `lang`, `language` ou `langue`, valant `fr` ou
+   `en`. La casse, les accents et la région sont ignorés : `EN`, `fr-FR`,
+   `english` ou `Français` conviennent.
+
+   ```yaml
+   ---
+   lang: en
+   ---
+   ```
+
+   Elle l'emporte toujours. Une autre langue (`lang: de`) désactive la
+   correction et le repérage sur cette note : mieux vaut ne rien faire que
+   d'appliquer les règles d'une autre langue.
+2. **La langue par défaut**, dans **Réglages → Insert Special Characters →
+   Langue par défaut des notes**, pour les notes qui ne déclarent pas la leur :
+
+   | Réglage | Effet |
+   | --- | --- |
+   | **Français** *(par défaut)* | Toutes ces notes sont françaises, comme avant l'existence du réglage. |
+   | **Anglais** | Toutes ces notes sont anglaises. |
+   | **Automatique** | La langue est déduite du texte, voir ci-dessous. |
+   | **Aucune** | Ces notes ne reçoivent ni correction ni repérage : seules celles qui déclarent leur langue sont concernées. |
+
+Avec **Automatique**, le plugin compte les mots-outils propres à chaque langue
+(*le, la, des, est…* contre *the, and, of, is…*) dans les 16 000 premiers
+caractères de la note, code, liens et métadonnées exclus. Il ne conclut que
+s'il en trouve au moins quatre et que la langue gagnante en compte au moins deux
+fois plus que l'autre. Une note trop courte, ou réellement bilingue, reste donc
+**indéterminée** : aucune règle ne s'y applique, plutôt qu'un pari.
+
+Quelques mots anglais dans une phrase française (« le cloud », « un
+fine-tuning ») ne changent rien : la ponctuation suit la langue de la phrase, pas
+celle du mot.
+
+### Langue de chaque paragraphe
+
+Une note n'a pas toujours une seule langue : une citation anglaise dans une note
+française, ou l'inverse. Le plugin juge donc aussi chaque **paragraphe**, c'est-à-dire
+un bloc de lignes non vides. Le code, les formules, les liens et les métadonnées
+sont écartés avant de juger, et un bloc de code sépare deux paragraphes.
+
+Un paragraphe a sa propre langue quand il compte **8 mots** au moins, dont **3
+mots-outils** au moins d'une langue, et deux fois plus que de l'autre. Sinon —
+trop court, ou partagé entre les deux langues — il suit la note : un titre, une
+ligne de tableau ou une phrase de quelques mots n'est jamais une exception.
+
+Cela vaut pour la correction, où chaque paragraphe d'une sélection est corrigé
+selon sa langue, jugée sur le paragraphe **entier** même si la sélection n'en
+couvre qu'une ligne, et pour le repérage des espaces fautives, qui n'examine
+plus que les paragraphes français.
+
+Deux précisions :
+
+- La propriété de la note fixe la langue de la *note*, pas celle de chaque
+  paragraphe : un paragraphe entièrement anglais reste reconnu dans une note
+  `lang: fr`.
+- Une note qui n'a volontairement aucune langue — réglage **Aucune**, ou langue
+  non prise en charge comme `lang: de` — est laissée telle quelle : aucun
+  paragraphe n'y est jugé. À l'inverse, une note en **Automatique** que la
+  détection n'a pas su trancher, typiquement une note bilingue, est décidée
+  paragraphe par paragraphe.
+
+### Forcer la langue d'un passage
+
+Quand la détection se trompe ou n'a pas de quoi juger — une seule phrase
+anglaise, trop courte pour être reconnue —, on fixe la langue à la main avec une
+balise HTML `span` portant l'attribut `lang` :
+
+```markdown
+Il a répondu <span lang="en">that's not "the" point</span>, puis il est parti !
+```
+
+Le contenu de la balise est corrigé et vérifié selon la langue indiquée, `fr` ou
+`en` avec les mêmes variantes que la propriété de la note (`EN`, `fr-FR`,
+`english`…), quelle que soit celle du paragraphe et de la note. La balise ne
+change rien à l'affichage en mode lecture.
+
+- Le forçage **l'emporte sur tout**, y compris dans une note qui n'a
+  volontairement aucune langue (réglage **Aucune**, `lang: de`) : c'est un choix
+  explicite, plus précis encore que la propriété.
+- Une autre langue (`<span lang="de">`) fait laisser le passage tel quel.
+- Les balises imbriquées se lisent de l'intérieur : la plus profonde l'emporte.
+- Le passage reste dans son paragraphe. Une ligne vide l'interrompt, et la
+  balise est alors ignorée, comme une balise jamais refermée ou sans valeur.
+- Une balise citée dans un bloc de code ou entre accents graves n'a aucun effet :
+  on peut donc l'écrire en exemple, comme ci-dessus.
+- Les mots du passage ne comptent pas dans la détection de leur paragraphe : une
+  citation anglaise ne fait pas basculer la phrase française qui l'entoure.
+- Seule la balise `span` est reconnue, son ouverture tenant sur une seule ligne.
+
+### Savoir quelle langue est retenue
+
+La commande **« Diagnostic : langue de la note »**, dans la palette de
+commandes, affiche pendant quelques secondes deux blocs : la langue retenue pour
+la note ouverte, puis celle du paragraphe sous le curseur, avec pour chacune
+d'où elle vient et ce que cela change :
+
+```
+Langue de la note : français
+Source : langue par défaut des réglages
+Langue par défaut des réglages : Français
+Effet : correction et repérage selon les règles françaises
+
+Paragraphe sous le curseur : anglais
+Source : détection du paragraphe (mots-outils : français 0, anglais 12 ; 20 mots)
+Effet : correction selon les règles anglaises, sans repérage des espaces
+```
+
+La source de la note est l'une des trois : la propriété de la note, la langue par
+défaut des réglages, ou la détection automatique (avec, alors, le décompte des
+mots-outils de chaque langue — utile quand elle refuse de conclure).
+
+Celle du paragraphe est soit une balise `<span lang>` qui entoure le curseur,
+soit sa propre détection, soit « hérite de la note », avec la raison :
+paragraphe trop court (le nombre de mots est donné), détection sans conclusion
+(le décompte aussi), curseur hors de tout paragraphe (ligne vide, code,
+métadonnées) ou note sans langue par choix.
+
 ## Corriger la typographie d'une sélection
 
 La commande **« Corriger la typographie de la sélection »** applique d'un coup
-les règles d'espacement du français au texte sélectionné. Elle n'a pas de
-raccourci par défaut : attribuez-le dans Réglages → Raccourcis clavier si vous
-l'utilisez souvent. Tout se défait d'un seul `Ctrl + Z`, et la sélection reste
-active après coup — utile, la plupart des corrections étant invisibles.
+les règles typographiques de la langue de la note au texte sélectionné. Elle
+n'a pas de raccourci par défaut : attribuez-le dans Réglages → Raccourcis
+clavier si vous l'utilisez souvent. Tout se défait d'un seul `Ctrl + Z`, et la
+sélection reste active après coup — utile, la plupart des corrections étant
+invisibles.
+
+Une sélection qui couvre plusieurs paragraphes de langues différentes est
+corrigée paragraphe par paragraphe, chacun selon la sienne (voir *Langue de
+chaque paragraphe*). Si aucune langue ne s'applique à la sélection, la commande
+n'écrit rien et le dit ; « Diagnostic : langue de la note » en donne la raison.
+
+### Notes en français
 
 Règles appliquées :
 
@@ -87,6 +219,24 @@ Règles appliquées :
 | `l'été` | apostrophe typographique `l’été` |
 | `Ah...` | points de suspension `Ah…` |
 | `mot , suite` | espace parasite avant la virgule supprimée |
+
+### Notes en anglais
+
+L'anglais n'a pas d'espace avant la ponctuation : la correction n'en ajoute
+donc aucune, et ne touche pas à celles qui existent.
+
+| Exemple | Correction appliquée |
+| --- | --- |
+| `He said "hello"` | guillemets courbes `He said “hello”` |
+| `don't`, `users'`, `1990's` | apostrophe typographique `don’t` |
+| `'hello'`, `'don't go'` | guillemets simples appariés `‘hello’` |
+| `Wait...` | points de suspension `Wait…` |
+| `word , next` | espace parasite avant la virgule supprimée |
+
+Sont laissés tels quels les cas ambigus : `'tis` (un ouvrant sans fermant),
+`5'10"` (pieds et pouces) et les guillemets droits non appariés.
+
+### Dans les deux langues
 
 La commande est **idempotente** : la relancer sur un texte déjà corrigé ne
 change rien, car les espaces insécables existantes sont reconnues.
@@ -211,7 +361,9 @@ modifié — activables séparément dans **Réglages → Insert Special Charact
 
 - **Les espaces insécables** sont encadrées d'un fond coloré, une couleur pour
   chacune, afin de les distinguer d'une espace normale.
-- **Les espaces fautives** sont soulignées d'un trait ondulé rouge, à la
+- **Les espaces fautives**, dans les paragraphes français seulement (voir
+  *Langue des notes* : un paragraphe anglais, ou dont la langue est
+  indéterminée, n'est jamais signalé), sont soulignées d'un trait ondulé rouge, à la
   manière d'un correcteur orthographique : là où le français impose une
   insécable (avant `;` `!` `?` `%` `:` et à l'intérieur des guillemets
   français), une espace ordinaire autorise un retour à la ligne devant la
@@ -265,7 +417,10 @@ signalé, faute de contexte.
 Le code est réparti par responsabilité : `main.ts` n'assure plus que
 l'orchestration (commandes, réglages, cycle de vie du plugin) et s'appuie sur
 `src/chars.ts` (table des caractères, recherche, insertion), `src/typography.ts`
-(règles de correction française, détection des espaces fautives et manquantes),
+(règles de correction française et anglaise, détection des espaces fautives et
+manquantes), `src/language.ts` (langue d'une note, de ses paragraphes et de ses
+passages forcés : propriété, réglage, détection ou balise `span`, et texte du
+diagnostic),
 `src/editor-decorations.ts` (surlignage dans l'éditeur, via CodeMirror),
 `src/settings.ts`, `src/settings-tab.ts` et `src/picker-modal.ts`.
 
@@ -274,6 +429,12 @@ internes, le module `obsidian` étant remplacé par le stub de
 `tests/obsidian-stub.js`. Ils couvrent
 la table des caractères (chaque point de code est comparé à une valeur attendue
 écrite indépendamment, plusieurs de ces caractères étant indiscernables à
-l'œil), la recherche, la correction typographique, l'entourage de la sélection,
-le signalement des espaces fautives, les caractères récents, ainsi que la
+l'œil), la recherche, la correction typographique dans chaque langue, l'entourage
+de la sélection, le signalement des espaces fautives, la langue des notes, de
+leurs paragraphes et de leurs passages forcés (propriété, détection, balises,
+ordre de résolution, diagnostic), les caractères récents, ainsi que la
 cohérence du README et des classes CSS avec le code.
+
+## Licence
+
+[MIT](LICENSE) © 2026 Matthieu Thomas.

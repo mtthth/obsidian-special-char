@@ -1,4 +1,5 @@
 import { NBSP, NNBSP } from "./chars";
+import type { Lang, LangSpan } from "./language";
 
 // Portions que la correction typographique ne doit jamais toucher : code,
 // maths, liens, URL. Le premier motif ne s'applique qu'en début de sélection
@@ -30,19 +31,28 @@ const PROTECTED_RE = new RegExp(
 	"g"
 );
 
+interface TypoRule {
+	pattern: RegExp;
+	replacement: string;
+}
+
+// Règles communes aux deux langues.
+const ELLIPSIS_RULE: TypoRule = { pattern: /\.\.\./g, replacement: "…" };
+const STRAY_COMMA_SPACE_RULE: TypoRule = { pattern: /[^\S\r\n]+,/g, replacement: "," };
+
 // Règles de typographie française, appliquées dans cet ordre. Toutes n'avalent
 // que des espaces horizontales ([^\S\r\n], qui couvre aussi les insécables
 // existantes) : une règle ne peut donc jamais fusionner deux lignes, et
 // réappliquer la commande sur un texte déjà correct ne change rien.
-const TYPO_RULES: { pattern: RegExp; replacement: string }[] = [
+const FRENCH_RULES: TypoRule[] = [
 	// Guillemets droits appariés sur une même ligne → guillemets français.
 	{ pattern: /"([^"\n]*)"/g, replacement: `«${NNBSP}$1${NNBSP}»` },
 	// Apostrophe droite → apostrophe typographique.
 	{ pattern: /'/g, replacement: "’" },
 	// Trois points → véritables points de suspension.
-	{ pattern: /\.\.\./g, replacement: "…" },
+	ELLIPSIS_RULE,
 	// Espace parasite avant une virgule.
-	{ pattern: /[^\S\r\n]+,/g, replacement: "," },
+	STRAY_COMMA_SPACE_RULE,
 	// Espace fine insécable avant ; ! ? — les suites comme « ?! » n'en
 	// reçoivent qu'une seule, et un signe en début de ligne est laissé tel quel.
 	{ pattern: /(\S)[^\S\r\n]*([;!?]+)/g, replacement: `$1${NNBSP}$2` },
@@ -57,15 +67,38 @@ const TYPO_RULES: { pattern: RegExp; replacement: string }[] = [
 	{ pattern: /(\S)[^\S\r\n]*»/g, replacement: `$1${NNBSP}»` },
 ];
 
-function fixPunctuation(chunk: string): string {
+// Règles de typographie anglaise : pas d'espace avant la ponctuation, donc rien
+// à ajouter de ce côté. Restent les guillemets courbes et l'apostrophe.
+const ENGLISH_RULES: TypoRule[] = [
+	// Guillemets droits appariés sur une même ligne → guillemets anglais.
+	{ pattern: /"([^"\n]*)"/g, replacement: "“$1”" },
+	// Guillemets simples appariés → ‘…’. L'ouvrant ne suit pas une lettre, le
+	// fermant n'en précède pas une, et une apostrophe entre deux lettres peut
+	// figurer dans la citation ('don't go'). Un ouvrant sans fermant ('tis,
+	// '90s) est ambigu : il est laissé tel quel.
+	{
+		pattern: /(?<![\p{L}\d'’])'((?:[^'\n]|(?<=[\p{L}\d])'(?=[\p{L}\d]))+?)'(?![\p{L}\d])/gu,
+		replacement: "‘$1’",
+	},
+	// Toute autre apostrophe droite qui suit une lettre (don't, users') ou un
+	// chiffre suivi d'une lettre (1990's) devient typographique. 5' et 5'10" —
+	// pieds et pouces — sont laissés intacts.
+	{ pattern: /(?<=\p{L})'|(?<=\d)'(?=\p{L})/gu, replacement: "’" },
+	ELLIPSIS_RULE,
+	STRAY_COMMA_SPACE_RULE,
+];
+
+const TYPO_RULES: Record<Lang, TypoRule[]> = { fr: FRENCH_RULES, en: ENGLISH_RULES };
+
+function fixPunctuation(chunk: string, lang: Lang): string {
 	let fixed = chunk;
-	for (const { pattern, replacement } of TYPO_RULES) {
+	for (const { pattern, replacement } of TYPO_RULES[lang]) {
 		fixed = fixed.replace(pattern, replacement);
 	}
 	return fixed;
 }
 
-function protectedRanges(text: string): [number, number][] {
+export function protectedRanges(text: string): [number, number][] {
 	const ranges: [number, number][] = [];
 
 	PROTECTED_RE.lastIndex = 0;
@@ -77,16 +110,48 @@ function protectedRanges(text: string): [number, number][] {
 	return ranges;
 }
 
-export function applyTypography(text: string): string {
+// Corrige chaque portion qui n'est pas protégée. `fix` reçoit la portion et sa
+// position dans le texte.
+function mapUnprotected(text: string, fix: (chunk: string, offset: number) => string): string {
 	let result = "";
 	let lastIndex = 0;
 
 	for (const [start, end] of protectedRanges(text)) {
-		result += fixPunctuation(text.slice(lastIndex, start)) + text.slice(start, end);
+		result += fix(text.slice(lastIndex, start), lastIndex) + text.slice(start, end);
 		lastIndex = end;
 	}
 
-	return result + fixPunctuation(text.slice(lastIndex));
+	return result + fix(text.slice(lastIndex), lastIndex);
+}
+
+// Une portion non protégée est encore découpée aux frontières des segments de
+// langue : une correction ne commence donc jamais au milieu d'un bloc de code,
+// ni ne mélange les règles de deux langues. Ce que les segments ne couvrent pas,
+// comme ce dont la langue est nulle, est laissé tel quel.
+function fixBySpans(chunk: string, offset: number, spans: LangSpan[]): string {
+	let fixed = "";
+	let pos = 0;
+
+	for (const span of spans) {
+		const from = Math.max(span.from - offset, pos);
+		const to = Math.min(span.to - offset, chunk.length);
+		if (to <= from) {
+			continue;
+		}
+		fixed += chunk.slice(pos, from);
+		fixed += span.lang ? fixPunctuation(chunk.slice(from, to), span.lang) : chunk.slice(from, to);
+		pos = to;
+	}
+
+	return fixed + chunk.slice(pos);
+}
+
+// `language` est une langue pour tout le texte, ou des segments triés, dont les
+// positions se comptent depuis le début de `text`.
+export function applyTypography(text: string, language: Lang | LangSpan[]): string {
+	const spans = typeof language === "string" ? [{ from: 0, to: text.length, lang: language }] : language;
+
+	return mapUnprotected(text, (chunk, offset) => fixBySpans(chunk, offset, spans));
 }
 
 // Espaces sécables là où le français impose une insécable. On ne signale que

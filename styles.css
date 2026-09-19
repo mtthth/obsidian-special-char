@@ -141,3 +141,8 @@
 	border-right: 5px solid transparent;
 	border-bottom: 7px solid var(--text-error, #e93147);
 }
+
+/* Diagnostic de langue : une information par ligne. */
+.special-char-diagnostic {
+	white-space: pre-line;
+}
