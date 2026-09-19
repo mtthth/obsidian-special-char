@@ -152,6 +152,8 @@ unchanged("Un&nbsp;espace, une&#39;apostrophe, un&#x27;autre", "entités HTML");
 unchanged("[ref]: https://exemple.fr", "définition de référence");
 unchanged("[^1]: Une note", "définition de note de bas de page");
 unchanged("Voir [ref]\n\n[ref]: https://exemple.fr", "définition de référence en fin de note");
+unchanged("Texte %% Attention: ici %%suite", "commentaire Obsidian (%% … %%)");
+unchanged("Avant %%\ncommentaire ; sur plusieurs lignes\n%% après", "commentaire sur plusieurs lignes");
 unchanged("   [ref]: https://exemple.fr", "définition de référence légèrement indentée");
 // Seuls le libellé et son deux-points sont protégés : la protection ne doit pas
 // déborder sur le texte de la note, ni sur ce qui n'est pas en début de ligne.
@@ -222,6 +224,8 @@ wrong("un % seul", "pourcentage sans chiffre devant", []);
 wrong("**Note :**", "deux-points suivi d'un marqueur d'emphase", [[6, 7]]);
 wrong("> [!NOTE] Attention", "marqueur de callout protégé", []);
 wrong("Un&nbsp;espace", "entité HTML protégée", []);
+wrong("Texte %% ici ; %%suite", "commentaire protégé", []);
+wrong("Avant %%\ncommentaire ;\n%% après", "commentaire sur plusieurs lignes protégé", []);
 
 // CodeMirror exige des plages triées : un ordre incorrect lèverait une
 // exception à l'affichage.
@@ -254,6 +258,8 @@ missing("[ref]: https://exemple.fr", "définition de référence : aucune espace
 missing("[^1]: Une note", "définition de note : aucune espace attendue", []);
 missing("Voir [ref]\n\n[ref]: https://exemple.fr", "définition de référence en fin de note", []);
 missing("Un&nbsp;espace", "entité HTML : pas de fausse alerte sur son ;", []);
+missing("Texte %% Attention: ici %%suite", "commentaire : pas de fausse alerte", []);
+missing("Avant %%\ncommentaire\nsans espace;ici%% après", "commentaire multiligne : pas de fausse alerte", []);
 
 section("Plages visibles de l'éditeur");
 // CodeMirror escamote des portions des lignes très longues : une même ligne
