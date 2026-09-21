@@ -127,6 +127,7 @@ typo("l'été", "l’été", "apostrophe typographique");
 typo("Ah...", "Ah…", "points de suspension");
 typo("mot , suite", "mot, suite", "espace parasite avant la virgule");
 typo("50 %", `50${NNBSP}%`, "fine avant le pourcentage");
+typo("50 % %% note %%", `50${NNBSP}% %% note %%`, "un pourcentage voisin d'un commentaire est corrigé");
 
 section("Correction : ce qui doit rester intact");
 unchanged("Rendez-vous à 12:30", "heure");
@@ -151,6 +152,11 @@ unchanged("> [!WARNING]- Repliable", "callout repliable, avec son suffixe");
 unchanged("Un&nbsp;espace, une&#39;apostrophe, un&#x27;autre", "entités HTML");
 unchanged("[ref]: https://exemple.fr", "définition de référence");
 unchanged("[^1]: Une note", "définition de note de bas de page");
+// %% ouvre et ferme un commentaire Obsidian : ce n'est pas un pourcentage, même
+// derrière un chiffre.
+unchanged("Total 50 %% à revoir %%", "espace avant l'ouvrant d'un commentaire");
+unchanged("%% relire p. 12 %%", "espace avant le fermant d'un commentaire");
+unchanged("%% p. 12%%", "fermant collé au chiffre");
 unchanged("Voir [ref]\n\n[ref]: https://exemple.fr", "définition de référence en fin de note");
 unchanged("   [ref]: https://exemple.fr", "définition de référence légèrement indentée");
 // Seuls le libellé et son deux-points sont protégés : la protection ne doit pas
@@ -219,6 +225,8 @@ wrong("voir ![[img.png]]", "espace avant une intégration", []);
 wrong("$a : b$", "formule en ligne protégée", []);
 wrong("[lien](https://x.fr/a?b=1)", "lien markdown protégé", []);
 wrong("un % seul", "pourcentage sans chiffre devant", []);
+wrong("Total 50 %% à revoir %%", "espace avant l'ouvrant d'un commentaire", []);
+wrong("%% relire p. 12 %%", "espace avant le fermant d'un commentaire", []);
 wrong("**Note :**", "deux-points suivi d'un marqueur d'emphase", [[6, 7]]);
 wrong("> [!NOTE] Attention", "marqueur de callout protégé", []);
 wrong("Un&nbsp;espace", "entité HTML protégée", []);
@@ -240,6 +248,8 @@ missing(`Bonjour${NBSP}!`, "insécable déjà présente : rien à signaler non p
 missing("Bonjour !", "espace ordinaire déjà présente : ce n'est pas une absence", []);
 missing("50%", "aucune espace avant le pourcentage", [2]);
 missing("un% seul", "pourcentage sans chiffre devant", []);
+missing("Total 50%% à revoir %%", "ouvrant de commentaire collé au chiffre", []);
+missing("%% relire p. 12%%", "fermant de commentaire collé au chiffre", []);
 missing("Attention: ici", "aucune espace avant le deux-points", [9]);
 missing("«bonjour»", "aucune espace des deux côtés des guillemets", [1, 8]);
 missing("Rendez-vous à 12:30", "heure : aucune espace attendue", []);

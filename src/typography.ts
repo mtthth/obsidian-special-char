@@ -56,8 +56,9 @@ const FRENCH_RULES: TypoRule[] = [
 	// Espace fine insécable avant ; ! ? — les suites comme « ?! » n'en
 	// reçoivent qu'une seule, et un signe en début de ligne est laissé tel quel.
 	{ pattern: /(\S)[^\S\r\n]*([;!?]+)/g, replacement: `$1${NNBSP}$2` },
-	// ... et avant le % d'un pourcentage.
-	{ pattern: /(\d)[^\S\r\n]*%/g, replacement: `$1${NNBSP}%` },
+	// ... et avant le % d'un pourcentage. Un « %% », délimiteur de commentaire
+	// Obsidian, n'en est pas un : `%(?!%)` l'écarte, où qu'il suive un chiffre.
+	{ pattern: /(\d)[^\S\r\n]*%(?!%)/g, replacement: `$1${NNBSP}%` },
 	// Espace insécable avant un deux-points, uniquement s'il termine un mot et
 	// est suivi d'une espace, d'une fin de ligne ou d'un marqueur d'emphase :
 	// 12:30, key::value, C:\dossier et les URL restent intacts.
@@ -161,8 +162,8 @@ export function applyTypography(text: string, language: Lang | LangSpan[]): stri
 const WRONG_SPACE_PATTERNS: RegExp[] = [
 	// Avant ; ! ? — un « ! » suivi de « [ » ouvre une image ou une intégration.
 	/[ \t]+(?=[;?]|!(?!\[))/g,
-	// Avant le % d'un pourcentage.
-	/(?<=\d)[ \t]+(?=%)/g,
+	// Avant le % d'un pourcentage, mais pas d'un « %% » (commentaire Obsidian).
+	/(?<=\d)[ \t]+(?=%(?!%))/g,
 	// Avant un deux-points qui termine un mot : 12:30 ou key::value, sans
 	// espace avant, ne sont pas concernés. Comme dans TYPO_RULES, un marqueur
 	// d'emphase peut suivre le deux-points (**Note :**).
@@ -203,8 +204,8 @@ const MISSING_SPACE_PATTERNS: RegExp[] = [
 	// une intégration, et un signe qui en suit un autre (« ?! ») n'exige pas sa
 	// propre espace.
 	/(?<=[^\s;!?])(?=[;?]|!(?!\[))/g,
-	// Avant le % d'un pourcentage.
-	/(?<=\d)(?=%)/g,
+	// Avant le % d'un pourcentage, mais pas d'un « %% » (commentaire Obsidian).
+	/(?<=\d)(?=%(?!%))/g,
 	// Avant un deux-points qui termine un mot : 12:30 ou key::value, sans
 	// espace avant ni après, ne sont pas concernés.
 	/(?<=[^\s:])(?=:(?:[ \t]|[*_]|$))/gm,

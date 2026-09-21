@@ -213,7 +213,7 @@ Règles appliquées :
 | --- | --- |
 | `Bonjour ; ça va ?` | espace fine insécable avant `;` `!` `?` |
 | `Attention : ici` | espace insécable avant `:` |
-| `50 %` | espace fine insécable avant `%` |
+| `50 %` | espace fine insécable avant `%` (jamais avant `%%`, qui délimite un commentaire) |
 | `« citation »` | espaces fines insécables à l'intérieur des guillemets |
 | `Il a dit "bonjour"` | guillemets droits appariés → « bonjour » |
 | `l'été` | apostrophe typographique `l’été` |
