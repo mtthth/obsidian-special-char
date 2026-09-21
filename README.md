@@ -244,7 +244,8 @@ change rien, car les espaces insécables existantes sont reconnues.
 Elle ne touche jamais : les blocs et portions de code, les formules `$…$`, les
 liens markdown et internes, les images intégrées, les URL, les balises HTML,
 les définitions de référence (`[ref]: url`) et de note de bas de page
-(`[^1]: texte`), ni le bloc de métadonnées quand la sélection commence par lui.
+(`[^1]: texte`), les commentaires (`%% … %%`), ni le bloc de métadonnées quand
+la sélection commence par lui.
 Les cas ambigus sont laissés tels quels : `12:30`, `clé:: valeur` (Dataview),
 `C:\dossier`, `:)` et les guillemets droits non appariés (`5"`).
 

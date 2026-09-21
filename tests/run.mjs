@@ -164,6 +164,8 @@ unchanged("Total 50 %% à revoir %%", "espace avant l'ouvrant d'un commentaire")
 unchanged("%% relire p. 12 %%", "espace avant le fermant d'un commentaire");
 unchanged("%% p. 12%%", "fermant collé au chiffre");
 unchanged("Voir [ref]\n\n[ref]: https://exemple.fr", "définition de référence en fin de note");
+unchanged("Texte %% Attention: ici %%suite", "commentaire Obsidian (%% … %%)");
+unchanged("Avant %%\ncommentaire ; sur plusieurs lignes\n%% après", "commentaire sur plusieurs lignes");
 unchanged("   [ref]: https://exemple.fr", "définition de référence légèrement indentée");
 // Seuls le libellé et son deux-points sont protégés : la protection ne doit pas
 // déborder sur le texte de la note, ni sur ce qui n'est pas en début de ligne.
@@ -236,6 +238,8 @@ wrong("%% relire p. 12 %%", "espace avant le fermant d'un commentaire", []);
 wrong("**Note :**", "deux-points suivi d'un marqueur d'emphase", [[6, 7]]);
 wrong("> [!NOTE] Attention", "marqueur de callout protégé", []);
 wrong("Un&nbsp;espace", "entité HTML protégée", []);
+wrong("Texte %% ici ; %%suite", "commentaire protégé", []);
+wrong("Avant %%\ncommentaire ;\n%% après", "commentaire sur plusieurs lignes protégé", []);
 
 // Une insécable ne rachète pas l'espace ordinaire qui la côtoie : la ligne peut
 // toujours se couper sur cette dernière.
@@ -292,6 +296,8 @@ missing("[ref]: https://exemple.fr", "définition de référence : aucune espace
 missing("[^1]: Une note", "définition de note : aucune espace attendue", []);
 missing("Voir [ref]\n\n[ref]: https://exemple.fr", "définition de référence en fin de note", []);
 missing("Un&nbsp;espace", "entité HTML : pas de fausse alerte sur son ;", []);
+missing("Texte %% Attention: ici %%suite", "commentaire : pas de fausse alerte", []);
+missing("Avant %%\ncommentaire\nsans espace;ici%% après", "commentaire multiligne : pas de fausse alerte", []);
 
 section("Signes portant le repère");
 const signs = (text, name, expected) => check(name, findFaultySigns(text), expected);

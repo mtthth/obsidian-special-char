@@ -24,6 +24,9 @@ const PROTECTED_RE = new RegExp(
 		"\\[!\\w+\\][+-]?",
 		// Entité HTML : &nbsp; &amp; &#39; &#x27;…
 		"&(?:[a-zA-Z]+|#\\d+|#x[0-9a-fA-F]+);",
+		// Commentaire Obsidian, invisible en lecture : %% … %%, sur une ou
+		// plusieurs lignes.
+		"%%[\\s\\S]*?%%",
 		"<[^>\\n]+>",
 		"[a-z][a-z0-9+.-]*:\\/\\/\\S+",
 		"www\\.\\S+",
