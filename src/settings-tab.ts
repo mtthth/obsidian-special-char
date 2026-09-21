@@ -1,5 +1,6 @@
 import { App, PluginSettingTab, Setting } from "obsidian";
 import type SpecialCharactersPlugin from "../main";
+import { LANGUAGE_SETTINGS, LANGUAGE_SETTING_LABELS, LanguageSetting } from "./language";
 
 export class SpecialCharSettingTab extends PluginSettingTab {
 	private plugin: SpecialCharactersPlugin;
@@ -27,9 +28,26 @@ export class SpecialCharSettingTab extends PluginSettingTab {
 			);
 
 		new Setting(containerEl)
+			.setName("Langue par défaut des notes")
+			.setDesc(
+				"Langue des notes qui ne déclarent pas la leur : une propriété lang, language ou langue, valant fr ou en, l'emporte toujours. « Automatique » la déduit du texte, et ne tranche pas quand les indices manquent ; « Aucune » n'agit que sur les notes qui déclarent leur langue. La commande « Diagnostic : langue de la note » indique celle retenue et pourquoi."
+			)
+			.addDropdown((dropdown) => {
+				for (const value of LANGUAGE_SETTINGS) {
+					dropdown.addOption(value, LANGUAGE_SETTING_LABELS[value]);
+				}
+				dropdown.setValue(this.plugin.settings.defaultLanguage).onChange(async (value) => {
+					this.plugin.settings.defaultLanguage = value as LanguageSetting;
+					await this.plugin.saveSettings();
+					// Les éditeurs ouverts doivent relire la langue, d'où un plugin neuf.
+					this.plugin.applyEditorDecorations();
+				});
+			});
+
+		new Setting(containerEl)
 			.setName("Signaler les espaces fautives")
 			.setDesc(
-				"Marque d'un repère rouge très visible chaque endroit où le français impose une insécable et où elle manque, avant ; ! ? % : et à l'intérieur des guillemets français — que l'espace soit d'un type incorrect ou totalement absente. La commande « Corriger la typographie de la sélection » corrige les deux."
+				"Dans les notes en français, marque d'un repère rouge très visible chaque endroit où le français impose une insécable et où elle manque, avant ; ! ? % : et à l'intérieur des guillemets français — que l'espace soit d'un type incorrect ou totalement absente. La commande « Corriger la typographie de la sélection » corrige les deux."
 			)
 			.addToggle((toggle) =>
 				toggle.setValue(this.plugin.settings.flagWrongSpaces).onChange(async (value) => {

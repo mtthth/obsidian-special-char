@@ -156,3 +156,8 @@
 .special-char-spacing-marker-after::after {
 	right: -5px;
 }
+
+/* Diagnostic de langue : une information par ligne. */
+.special-char-diagnostic {
+	white-space: pre-line;
+}

@@ -12,6 +12,9 @@ export const root = path.resolve(import.meta.dirname, "..");
 const ENTRY = [
 	`export * from "./src/chars";`,
 	`export * from "./src/typography";`,
+	`export * from "./src/language";`,
+	// Le stub de Notice consigne les messages : c'est ce que voit l'utilisateur.
+	`export { Notice } from "obsidian";`,
 	`export * from "./src/settings";`,
 	`export * from "./src/editor-decorations";`,
 	`export * from "./src/picker-modal";`,
@@ -93,6 +96,14 @@ export class FakeEditor {
 			offset += lines[i].length + 1;
 		}
 		return offset + pos.ch;
+	}
+
+	getValue() {
+		return this.text;
+	}
+
+	posToOffset(pos) {
+		return this.offsetAt(pos);
 	}
 
 	somethingSelected() {

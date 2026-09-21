@@ -1,7 +1,15 @@
 import { Editor, Notice, Plugin } from "obsidian";
 import { Extension } from "@codemirror/state";
 import { ALL_CHARS, SpecialChar, codePointLabel, hotkey, insertSpecialChar } from "./src/chars";
-import { invisibleSpacesViewPlugin, wrongSpacesViewPlugin } from "./src/editor-decorations";
+import { createWrongSpacesViewPlugin, invisibleSpacesViewPlugin } from "./src/editor-decorations";
+import {
+	LANGUAGE_SETTINGS,
+	describeLanguage,
+	languageSpans,
+	paragraphDetectionApplies,
+	resolveLanguage,
+	resolveParagraph,
+} from "./src/language";
 import { SpecialCharacterModal } from "./src/picker-modal";
 import { DEFAULT_SETTINGS, RECENT_COUNT, SpecialCharPluginSettings } from "./src/settings";
 import { SpecialCharSettingTab } from "./src/settings-tab";
@@ -39,6 +47,12 @@ export default class SpecialCharactersPlugin extends Plugin {
 			editorCallback: (editor: Editor) => this.fixTypography(editor),
 		});
 
+		this.addCommand({
+			id: "diagnose-note-language",
+			name: "Diagnostic : langue de la note",
+			editorCallback: (editor: Editor) => this.diagnoseLanguage(editor),
+		});
+
 		// Une commande dédiée par caractère : chacune peut recevoir son propre
 		// raccourci dans Réglages → Raccourcis clavier. Seuls les quatre
 		// caractères les plus courants en ont un par défaut, pour éviter les
@@ -61,8 +75,27 @@ export default class SpecialCharactersPlugin extends Plugin {
 			return;
 		}
 
+		// La langue vient de la note et de ses paragraphes entiers, pas des quelques
+		// mots sélectionnés, qui ne permettraient pas de la deviner : une sélection
+		// peut d'ailleurs couvrir des paragraphes de langues différentes, chacun
+		// corrigé selon la sienne. Les positions sont ramenées au début de la
+		// sélection, que le texte à corriger prend pour origine.
+		const doc = editor.getValue();
+		const note = resolveLanguage(doc, this.settings.defaultLanguage);
+		const start = editor.posToOffset(editor.getCursor("from"));
+		const end = editor.posToOffset(editor.getCursor("to"));
+		const spans = languageSpans(doc, note.lang, paragraphDetectionApplies(note))
+			.filter((span) => span.to > start && span.from < end)
+			.map((span) => ({ ...span, from: span.from - start, to: span.to - start }));
+		if (!spans.some((span) => span.lang)) {
+			new Notice(
+				"La langue de cette sélection est indéterminée ou non prise en charge : rien n'a été corrigé. Voir « Diagnostic : langue de la note »."
+			);
+			return;
+		}
+
 		const selection = editor.getSelection();
-		const corrected = applyTypography(selection);
+		const corrected = applyTypography(selection, spans);
 		if (corrected === selection) {
 			new Notice("Rien à corriger dans cette sélection.");
 			return;
@@ -75,6 +108,15 @@ export default class SpecialCharactersPlugin extends Plugin {
 		editor.replaceSelection(corrected);
 		editor.setSelection(from, editor.getCursor());
 		new Notice("Typographie corrigée.");
+	}
+
+	private diagnoseLanguage(editor: Editor) {
+		const doc = editor.getValue();
+		const note = resolveLanguage(doc, this.settings.defaultLanguage);
+		const paragraph = resolveParagraph(doc, editor.posToOffset(editor.getCursor()), note);
+		const lines = describeLanguage(note, this.settings.defaultLanguage, paragraph);
+		// Une information par ligne : la classe rend les retours à la ligne.
+		new Notice(lines.join("\n"), 10000).noticeEl.addClass("special-char-diagnostic");
 	}
 
 	private openPicker() {
@@ -94,6 +136,9 @@ export default class SpecialCharactersPlugin extends Plugin {
 		}
 		if (!Array.isArray(this.settings.customChars)) {
 			this.settings.customChars = [];
+		}
+		if (!LANGUAGE_SETTINGS.includes(this.settings.defaultLanguage)) {
+			this.settings.defaultLanguage = DEFAULT_SETTINGS.defaultLanguage;
 		}
 	}
 
@@ -145,7 +190,7 @@ export default class SpecialCharactersPlugin extends Plugin {
 			this.editorExtensions.push(invisibleSpacesViewPlugin);
 		}
 		if (this.settings.flagWrongSpaces) {
-			this.editorExtensions.push(wrongSpacesViewPlugin);
+			this.editorExtensions.push(createWrongSpacesViewPlugin(() => this.settings.defaultLanguage));
 		}
 		this.app.workspace.updateOptions();
 	}
