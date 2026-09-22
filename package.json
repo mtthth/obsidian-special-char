@@ -15,7 +15,7 @@
 		"typography",
 		"french"
 	],
-	"author": "",
+	"author": "Matthieu Thomas (cidrolin)",
 	"license": "MIT",
 	"devDependencies": {
 		"@codemirror/state": "6.5.0",

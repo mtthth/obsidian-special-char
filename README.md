@@ -8,6 +8,8 @@ opérateurs mathématiques, flèches…
 Il met aussi en évidence les espaces insécables directement dans la fenêtre
 d'édition, où elles sont normalement invisibles.
 
+Écrit par Matthieu Thomas (cidrolin), sous [licence MIT](LICENSE).
+
 ## Utilisation
 
 Trois façons d'insérer un caractère :
@@ -439,4 +441,4 @@ cohérence du README et des classes CSS avec le code.
 
 ## Licence
 
-[MIT](LICENSE) © 2026 Matthieu Thomas.
+[MIT](LICENSE) © 2026 Matthieu Thomas (cidrolin).

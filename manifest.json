@@ -4,7 +4,7 @@
 	"version": "1.0.0",
 	"minAppVersion": "1.0.0",
 	"description": "Insère rapidement les caractères typographiques difficiles à taper (espaces insécables, guillemets, capitales accentuées, ligatures, tirets, flèches…) et rend les espaces insécables visibles dans l'éditeur.",
-	"author": "matthieu.thomas",
+	"author": "Matthieu Thomas (cidrolin)",
 	"authorUrl": "",
 	"isDesktopOnly": false
 }
