@@ -8,7 +8,8 @@ opérateurs mathématiques, flèches…
 Il met aussi en évidence les espaces insécables directement dans la fenêtre
 d'édition, où elles sont normalement invisibles.
 
-Écrit par Matthieu Thomas (cidrolin), sous [licence MIT](LICENSE).
+Écrit par [Matthieu Thomas (cidrolin)](https://github.com/mtthth), sous
+[licence MIT](LICENSE).
 
 ## Utilisation
 
