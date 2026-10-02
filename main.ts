@@ -35,7 +35,7 @@ export default class SpecialCharactersPlugin extends Plugin {
 		// Une commande dédiée par caractère : chacune peut recevoir son propre
 		// raccourci dans Réglages → Raccourcis clavier. Seuls les quatre
 		// caractères les plus courants en ont un par défaut, pour éviter les
-		// conflits qu'imposeraient une quarantaine de raccourcis imposés.
+		// conflits qu'imposeraient plus de 300 raccourcis imposés.
 		for (const item of ALL_CHARS) {
 			this.addCommand({
 				id: `insert-${item.id}`,

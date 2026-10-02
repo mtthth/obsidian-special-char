@@ -13,57 +13,16 @@ const {
 	insertSpecialChar,
 } = plugin;
 
-// Points de code attendus, écrits indépendamment de main.ts : plusieurs de ces
-// caractères sont indiscernables à l'œil (· • ◦, µ contre le mu grec, – contre
-// —), une relecture visuelle ne prouverait rien.
-const EXPECTED_CODE_POINTS = {
-	"narrow-nbsp": "202F",
-	nbsp: "00A0",
-	"guillemet-ouvrant": "00AB",
-	"guillemet-fermant": "00BB",
-	"guillemet-anglais-ouvrant": "201C",
-	"guillemet-anglais-fermant": "201D",
-	"apostrophe-ouvrante": "2018",
-	"apostrophe-typographique": "2019",
-	"tiret-cadratin": "2014",
-	"tiret-demi-cadratin": "2013",
-	"point-median": "00B7",
-	"points-suspension": "2026",
-	"oe-minuscule": "0153",
-	"oe-majuscule": "0152",
-	"ae-minuscule": "00E6",
-	"ae-majuscule": "00C6",
-	"a-grave-maj": "00C0",
-	"a-circonflexe-maj": "00C2",
-	"c-cedille-maj": "00C7",
-	"e-aigu-maj": "00C9",
-	"e-grave-maj": "00C8",
-	"e-circonflexe-maj": "00CA",
-	"e-trema-maj": "00CB",
-	"i-circonflexe-maj": "00CE",
-	"i-trema-maj": "00CF",
-	"o-circonflexe-maj": "00D4",
-	"u-grave-maj": "00D9",
-	"u-circonflexe-maj": "00DB",
-	"u-trema-maj": "00DC",
-	"y-trema-maj": "0178",
-	multiplication: "00D7",
-	division: "00F7",
-	"environ-egal": "2248",
-	"plus-ou-moins": "00B1",
-	micro: "00B5",
-	puce: "2022",
-	"puce-creuse": "25E6",
-	yen: "00A5",
-	livre: "00A3",
-	"fleche-gauche": "2190",
-	"fleche-droite": "2192",
-	"fleche-haut": "2191",
-	"fleche-bas": "2193",
-};
+// Points de code attendus, écrits indépendamment de src/chars.ts (fichier
+// JSON voisin) : plusieurs de ces caractères sont indiscernables à l'œil
+// (· • ◦, µ contre le mu grec, – contre —, les espaces), une relecture visuelle
+// ne prouverait rien.
+const EXPECTED_CODE_POINTS = JSON.parse(readFileSync(path.join(root, "tests", "expected-code-points.json"), "utf8"));
 
 const codePointOf = (char) =>
 	[...char].map((c) => c.codePointAt(0).toString(16).toUpperCase().padStart(4, "0")).join("+");
+
+const byId = (id) => ALL_CHARS.find((c) => c.id === id);
 
 section("Table des caractères");
 check("nombre de caractères", ALL_CHARS.length, Object.keys(EXPECTED_CODE_POINTS).length);
@@ -86,27 +45,46 @@ const search = (raw) => {
 };
 
 check("recherche vide : tout est affiché", search("").length, ALL_CHARS.length);
-check("accents ignorés : « fleche » trouve les flèches", search("fleche"), [
+check("accents ignorés : « fleche » trouve les flèches", search("fleche").slice(0, 4), [
 	"fleche-gauche",
 	"fleche-droite",
 	"fleche-haut",
 	"fleche-bas",
 ]);
-check("« Flèche » accentué donne le même résultat", search("Flèche").length, 4);
-check("« cadratin » trouve les deux tirets", search("cadratin"), ["tiret-cadratin", "tiret-demi-cadratin"]);
+check("toutes les flèches, et elles seules", search("fleche").every((id) => id.startsWith("fleche-")), true);
+check("« Flèche » accentué donne le même résultat", search("Flèche"), search("fleche"));
+check("« cadratin » trouve les tirets et les espaces cadratins", search("cadratin"), [
+	"espace-demi-cadratin",
+	"espace-cadratin",
+	"tiret-cadratin",
+	"tiret-demi-cadratin",
+]);
 check("« anglais » ne trouve que les guillemets anglais", search("anglais"), [
 	"guillemet-anglais-ouvrant",
 	"guillemet-anglais-fermant",
 ]);
 // Un nom de catégorie est aussi un critère : « guillemet » remonte donc les
 // six caractères de « Guillemets et apostrophes ».
-check("un nom de catégorie remonte toute la catégorie", search("guillemet").length, 6);
+check("un nom de catégorie remonte toute la catégorie", search("guillemet").length, 10);
 check("recherche par point de code", search("202f"), ["narrow-nbsp"]);
 check("recherche par point de code préfixé", search("u+2014"), ["tiret-cadratin"]);
 check("recherche par le caractère lui-même", search("→"), ["fleche-droite"]);
 check("casse ignorée", search("MICRO"), ["micro"]);
 check("aucun résultat", search("zzz"), []);
 check("normalisation NFD", normalizeForSearch("Ç_É_Ê_Ü"), "c_e_e_u");
+
+// Sur un clavier qwerty, on cherche une lettre de base pour trouver ses
+// variantes accentuées. Les libellés contiennent presque tous un « e » : sans
+// règle propre aux requêtes d'une lettre, « e » renverrait toute la table.
+section("Recherche à une lettre");
+const bases = (raw) => new Set(search(raw).map((id) => normalizeForSearch(byId(id).char)));
+check("« e » ne trouve que des e", [...bases("e")], ["e"]);
+check("« e » trouve é è ê ë et leurs capitales", ["é", "è", "ê", "ë", "É", "È", "Ê", "Ë"].every((c) => search("e").includes(ALL_CHARS.find((x) => x.char === c).id)), true);
+check("« E » majuscule donne le même résultat", search("E"), search("e"));
+check("« ø » trouve les deux casses du o barré", search("ø"), ["o-barre-min", "o-barre-maj"]);
+check("« ß » trouve l'eszett minuscule et majuscule", search("ß"), ["ss-min", "ss-maj"]);
+check("« ss » trouve l'eszett par son libellé", search("ss").filter((id) => id.startsWith("ss-")), ["ss-min", "ss-maj"]);
+check("« thorn » et « th » trouvent le thorn", search("thorn"), ["thorn-min", "thorn-maj"]);
 
 
 section("Entourer la sélection");
@@ -137,7 +115,6 @@ check("sans sélection : insertion simple", sansSelection.text, "a«b");
 check("sans sélection : curseur après le caractère", sansSelection.cursor, 2);
 
 section("Caractères récents");
-const byId = (id) => ALL_CHARS.find((c) => c.id === id);
 // Les réglages du banc d'essai sont copiés des vrais défauts : un réglage
 // ajouté plus tard ne peut pas manquer ici sans qu'on s'en aperçoive.
 const newPlugin = () => {

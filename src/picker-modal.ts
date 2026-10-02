@@ -25,7 +25,7 @@ export class SpecialCharacterModal extends Modal {
 			cls: "special-char-search",
 			attr: {
 				type: "text",
-				placeholder: "Rechercher (cadratin, majuscule, flèche…)",
+				placeholder: "Rechercher (e, ß, cadratin, flèche…)",
 			},
 		});
 
@@ -48,8 +48,8 @@ export class SpecialCharacterModal extends Modal {
 	}
 
 	// Les caractères personnalisés passent devant la liste intégrée : c'est une
-	// courte liste choisie par l'utilisateur, la reléguer sous 43 entrées la
-	// rendrait inutile. Les récents, eux, ne s'affichent qu'en l'absence de
+	// courte liste choisie par l'utilisateur, la reléguer sous plus de 300 entrées
+	// la rendrait inutile. Les récents, eux, ne s'affichent qu'en l'absence de
 	// recherche : pendant un filtrage, ils feraient apparaître deux fois les
 	// mêmes caractères.
 	private groupsToRender(hasQuery: boolean): CharGroup[] {
