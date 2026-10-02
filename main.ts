@@ -47,6 +47,19 @@ export default class SpecialCharactersPlugin extends Plugin {
 			editorCallback: (editor: Editor) => this.fixTypography(editor),
 		});
 
+		// Clic droit : l'entrée n'apparaît que s'il y a une sélection à corriger.
+		this.registerEvent(
+			this.app.workspace.on("editor-menu", (menu, editor) => {
+				if (!editor.somethingSelected()) return;
+				menu.addItem((item) =>
+					item
+						.setTitle("Corriger la typographie de la sélection")
+						.setIcon("text-cursor-input")
+						.onClick(() => this.fixTypography(editor))
+				);
+			})
+		);
+
 		this.addCommand({
 			id: "diagnose-note-language",
 			name: "Diagnostic : langue de la note",
