@@ -11,8 +11,6 @@ export const root = path.resolve(import.meta.dirname, "..");
 // y a à vérifier, sans avoir à lancer Obsidian.
 const ENTRY = [
 	`export * from "./src/chars";`,
-	`export * from "./src/typography";`,
-	`export * from "./src/language";`,
 	// Le stub de Notice consigne les messages : c'est ce que voit l'utilisateur.
 	`export { Notice } from "obsidian";`,
 	`export * from "./src/settings";`,

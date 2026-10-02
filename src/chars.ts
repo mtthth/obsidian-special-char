@@ -21,7 +21,7 @@ export const hotkey = (key: string): Hotkey => ({ modifiers: ["Mod", "Shift"], k
 
 // Ces deux constantes contiennent de véritables caractères d'espace, invisibles
 // dans un éditeur de code : les nommer évite d'avoir à les distinguer à l'œil,
-// notamment dans les règles de typographie.
+// notamment dans les tests et les décorations de l'éditeur.
 export const NNBSP = " "; // espace fine insécable
 export const NBSP = " "; // espace insécable
 
