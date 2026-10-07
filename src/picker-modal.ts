@@ -1,5 +1,6 @@
 import { Editor, Modal, Platform } from "obsidian";
-import { CHAR_GROUPS, CharGroup, SpecialChar, codePointLabel, matchesQuery, normalizeForSearch } from "./chars";
+import { CHAR_GROUPS, CharGroup, SpecialChar, charLabel, codePointLabel, groupName, matchesQuery, normalizeForSearch } from "./chars";
+import { t } from "./i18n";
 import type SpecialCharactersPlugin from "../main";
 
 export class SpecialCharacterModal extends Modal {
@@ -19,13 +20,13 @@ export class SpecialCharacterModal extends Modal {
 		const { contentEl } = this;
 		this.modalEl.addClass("special-char-modal");
 
-		contentEl.createEl("h2", { text: "Caractères spéciaux" });
+		contentEl.createEl("h2", { text: t("modal.title") });
 
 		this.searchEl = contentEl.createEl("input", {
 			cls: "special-char-search",
 			attr: {
 				type: "text",
-				placeholder: "Rechercher (e, ß, cadratin, flèche…)",
+				placeholder: t("modal.placeholder"),
 			},
 		});
 
@@ -55,14 +56,14 @@ export class SpecialCharacterModal extends Modal {
 	private groupsToRender(hasQuery: boolean): CharGroup[] {
 		const custom = this.plugin.getCustomChars();
 		const groups =
-			custom.length > 0 ? [{ category: "Personnalisés", chars: custom }, ...CHAR_GROUPS] : CHAR_GROUPS;
+			custom.length > 0 ? [{ category: t("modal.custom"), chars: custom }, ...CHAR_GROUPS] : CHAR_GROUPS;
 
 		if (hasQuery) {
 			return groups;
 		}
 
 		const recents = this.plugin.getRecentChars();
-		return recents.length > 0 ? [{ category: "Récents", chars: recents }, ...groups] : groups;
+		return recents.length > 0 ? [{ category: t("modal.recent"), chars: recents }, ...groups] : groups;
 	}
 
 	private renderResults(query: string) {
@@ -72,13 +73,13 @@ export class SpecialCharacterModal extends Modal {
 		this.visibleChars = [];
 
 		for (const group of this.groupsToRender(normalizedQuery.length > 0)) {
-			const matches = group.chars.filter((item) => matchesQuery(item, group.category, normalizedQuery));
+			const matches = group.chars.filter((item) => matchesQuery(item, groupName(group), normalizedQuery));
 			if (matches.length === 0) {
 				continue;
 			}
 
 			const section = this.resultsEl.createDiv({ cls: "special-char-section" });
-			section.createDiv({ cls: "special-char-section-title", text: group.category });
+			section.createDiv({ cls: "special-char-section-title", text: groupName(group) });
 			const list = section.createDiv({ cls: "special-char-list" });
 
 			for (const item of matches) {
@@ -90,23 +91,24 @@ export class SpecialCharacterModal extends Modal {
 		if (this.visibleChars.length === 0) {
 			this.resultsEl.createDiv({
 				cls: "special-char-empty",
-				text: "Aucun caractère ne correspond à cette recherche.",
+				text: t("modal.empty"),
 			});
 		}
 	}
 
 	private createCharButton(parent: HTMLElement, item: SpecialChar) {
 		const code = codePointLabel(item.char);
+		const label = charLabel(item);
 		const button = parent.createEl("button", {
 			cls: "special-char-button",
 			attr: {
-				"aria-label": `${item.label} (${code})`,
-				title: `${item.label} — ${code}`,
+				"aria-label": `${label} (${code})`,
+				title: `${label} — ${code}`,
 			},
 		});
 
 		button.createDiv({ cls: "special-char-preview", text: item.preview ?? item.char });
-		button.createDiv({ cls: "special-char-label", text: item.label });
+		button.createDiv({ cls: "special-char-label", text: label });
 
 		button.addEventListener("click", () => this.chooseChar(item));
 	}

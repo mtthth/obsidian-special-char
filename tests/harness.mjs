@@ -13,6 +13,7 @@ const ENTRY = [
 	`export * from "./src/chars";`,
 	// Le stub de Notice consigne les messages : c'est ce que voit l'utilisateur.
 	`export { Notice } from "obsidian";`,
+	`export * from "./src/i18n";`,
 	`export * from "./src/settings";`,
 	`export * from "./src/editor-decorations";`,
 	`export * from "./src/picker-modal";`,

@@ -35,6 +35,10 @@
 	gap: 0.3em;
 	padding: 0.6em 0.4em;
 	min-height: 66px;
+	/* Obsidian gives buttons a fixed height and nowrap text, which would keep a
+	   name on one line and cut it off. */
+	height: auto;
+	white-space: normal;
 	border-radius: var(--radius-m, 6px);
 	border: 1px solid var(--background-modifier-border);
 	background-color: var(--background-secondary);
@@ -69,6 +73,8 @@
 	overflow: hidden;
 	font-size: 0.72em;
 	line-height: 1.25;
+	white-space: normal;
+	overflow-wrap: anywhere;
 	color: var(--text-muted);
 }
 

@@ -1,7 +1,8 @@
 import { Editor, Notice, Plugin } from "obsidian";
 import { Extension } from "@codemirror/state";
-import { ALL_CHARS, SpecialChar, codePointLabel, hotkey, insertSpecialChar } from "./src/chars";
+import { ALL_CHARS, SpecialChar, charLabel, codePointLabel, hotkey, insertSpecialChar } from "./src/chars";
 import { invisibleSpacesViewPlugin } from "./src/editor-decorations";
+import { DEFAULT_LANGUAGE, isLanguage, setLanguage, t } from "./src/i18n";
 import { SpecialCharacterModal } from "./src/picker-modal";
 import { DEFAULT_SETTINGS, RECENT_COUNT, SpecialCharPluginSettings } from "./src/settings";
 import { SpecialCharSettingTab } from "./src/settings-tab";
@@ -12,6 +13,8 @@ export default class SpecialCharactersPlugin extends Plugin {
 	// éditeur, existant comme futur : le modifier puis appeler updateOptions()
 	// est la façon documentée de reconfigurer une extension CodeMirror 6.
 	private editorExtensions: Extension[] = [];
+	private ribbonEl: HTMLElement | null = null;
+	private commandIds: string[] = [];
 
 	async onload() {
 		await this.loadSettings();
@@ -21,37 +24,58 @@ export default class SpecialCharactersPlugin extends Plugin {
 
 		this.addSettingTab(new SpecialCharSettingTab(this.app, this));
 
+		this.ribbonEl = this.addRibbonIcon("text-cursor-input", t("ribbon.picker"), () => {
+			this.openPicker();
+		});
+		this.registerCommands();
+	}
+
+	// Command names are fixed at registration, so a language change removes and
+	// registers them again. Ids stay the same, which keeps the hotkeys the user
+	// assigned in Settings → Hotkeys.
+	private registerCommands() {
+		for (const id of this.commandIds) {
+			this.removeCommand(id);
+		}
+		this.commandIds = [];
+
 		this.addCommand({
 			id: "open-special-characters-picker",
-			name: "Insérer un caractère spécial (fenêtre)",
+			name: t("command.picker"),
 			hotkeys: [hotkey("S")],
 			callback: () => this.openPicker(),
 		});
+		this.commandIds.push("open-special-characters-picker");
 
-		this.addRibbonIcon("text-cursor-input", "Insérer un caractère spécial", () => {
-			this.openPicker();
-		});
-
-		// Une commande dédiée par caractère : chacune peut recevoir son propre
-		// raccourci dans Réglages → Raccourcis clavier. Seuls les quatre
-		// caractères les plus courants en ont un par défaut, pour éviter les
-		// conflits qu'imposeraient plus de 300 raccourcis imposés.
+		// One command per character: each can get its own hotkey in Settings →
+		// Hotkeys. Only the four most common ones have a default, to avoid the
+		// conflicts that more than 300 imposed hotkeys would cause.
 		for (const item of ALL_CHARS) {
+			const id = `insert-${item.id}`;
 			this.addCommand({
-				id: `insert-${item.id}`,
-				name: `Insérer : ${item.label}`,
+				id,
+				name: t("command.insert", { label: charLabel(item) }),
 				hotkeys: item.hotkey ? [item.hotkey] : [],
 				editorCallback: (editor: Editor) => {
 					this.insertChar(editor, item);
 				},
 			});
+			this.commandIds.push(id);
 		}
+	}
+
+	// Applies the language setting to everything already registered; the picker
+	// and the settings tab read it each time they are displayed.
+	applyLanguage() {
+		setLanguage(this.settings.language);
+		this.registerCommands();
+		this.ribbonEl?.setAttribute("aria-label", t("ribbon.picker"));
 	}
 
 	private openPicker() {
 		const editor = this.app.workspace.activeEditor?.editor;
 		if (!editor) {
-			new Notice("Ouvrez d'abord une note pour insérer un caractère spécial.");
+			new Notice(t("notice.noEditor"));
 			return;
 		}
 		new SpecialCharacterModal(this, editor).open();
@@ -59,6 +83,10 @@ export default class SpecialCharactersPlugin extends Plugin {
 
 	async loadSettings() {
 		this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData());
+		if (!isLanguage(this.settings.language)) {
+			this.settings.language = DEFAULT_LANGUAGE;
+		}
+		setLanguage(this.settings.language);
 		// data.json peut avoir été édité à la main ou abîmé par une synchro.
 		if (!Array.isArray(this.settings.recentChars)) {
 			this.settings.recentChars = [];

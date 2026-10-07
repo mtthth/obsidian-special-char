@@ -1,7 +1,7 @@
 {
 	"name": "obsidian-special-char",
 	"version": "1.0.0",
-	"description": "Insère rapidement les caractères typographiques difficiles à taper (espaces insécables, guillemets, lettres accentuées européennes, ligatures, tirets, monnaies, flèches…) et rend les espaces insécables visibles dans l'éditeur.",
+	"description": "Quickly insert hard-to-type typographic characters (non-breaking spaces, quotes, accented European letters, ligatures, dashes, arrows…) and make non-breaking spaces visible in the editor.",
 	"main": "main.js",
 	"scripts": {
 		"dev": "node esbuild.config.mjs",

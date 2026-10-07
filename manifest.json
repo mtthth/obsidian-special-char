@@ -2,8 +2,8 @@
 	"id": "insert-special-characters",
 	"name": "Insert Special Characters",
 	"version": "1.0.0",
-	"minAppVersion": "1.0.0",
-	"description": "Insère rapidement les caractères typographiques difficiles à taper (espaces insécables, guillemets, capitales accentuées, ligatures, tirets, flèches…) et rend les espaces insécables visibles dans l'éditeur.",
+	"minAppVersion": "1.7.2",
+	"description": "Quickly insert hard-to-type typographic characters (non-breaking spaces, quotes, accented European letters, ligatures, dashes, arrows…) and make non-breaking spaces visible in the editor.",
 	"author": "Matthieu Thomas (cidrolin)",
 	"authorUrl": "https://github.com/mtthth",
 	"isDesktopOnly": false

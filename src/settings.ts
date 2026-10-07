@@ -1,3 +1,5 @@
+import { DEFAULT_LANGUAGE, Language } from "./i18n";
+
 export interface CustomChar {
 	id: string;
 	char: string;
@@ -5,12 +7,14 @@ export interface CustomChar {
 }
 
 export interface SpecialCharPluginSettings {
+	language: Language;
 	showInvisibleSpaces: boolean;
 	recentChars: string[];
 	customChars: CustomChar[];
 }
 
 export const DEFAULT_SETTINGS: SpecialCharPluginSettings = {
+	language: DEFAULT_LANGUAGE,
 	showInvisibleSpaces: true,
 	recentChars: [],
 	customChars: [],

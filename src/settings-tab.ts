@@ -1,4 +1,5 @@
 import { App, PluginSettingTab, Setting } from "obsidian";
+import { LANGUAGES, isLanguage, t } from "./i18n";
 import type SpecialCharactersPlugin from "../main";
 
 export class SpecialCharSettingTab extends PluginSettingTab {
@@ -14,10 +15,27 @@ export class SpecialCharSettingTab extends PluginSettingTab {
 		containerEl.empty();
 
 		new Setting(containerEl)
-			.setName("Afficher les espaces insécables dans l'éditeur")
-			.setDesc(
-				"Encadre visuellement les espaces insécable et fine insécable (U+00A0, U+202F) dans la fenêtre d'édition, pour les distinguer des espaces normales."
-			)
+			.setName(t("settings.language.name"))
+			.setDesc(t("settings.language.desc"))
+			.addDropdown((dropdown) => {
+				for (const language of LANGUAGES) {
+					dropdown.addOption(language, t(`settings.language.${language}`));
+				}
+				dropdown.setValue(this.plugin.settings.language).onChange(async (value) => {
+					if (!isLanguage(value)) {
+						return;
+					}
+					this.plugin.settings.language = value;
+					await this.plugin.saveSettings();
+					this.plugin.applyLanguage();
+					// Redraw: the tab itself is in the language just chosen.
+					this.display();
+				});
+			});
+
+		new Setting(containerEl)
+			.setName(t("settings.showSpaces.name"))
+			.setDesc(t("settings.showSpaces.desc"))
 			.addToggle((toggle) =>
 				toggle.setValue(this.plugin.settings.showInvisibleSpaces).onChange(async (value) => {
 					this.plugin.settings.showInvisibleSpaces = value;
@@ -31,13 +49,11 @@ export class SpecialCharSettingTab extends PluginSettingTab {
 
 	private displayCustomChars(containerEl: HTMLElement) {
 		new Setting(containerEl)
-			.setName("Caractères personnalisés")
-			.setDesc(
-				"Vos propres caractères, affichés en tête de la fenêtre de sélection et trouvés par la recherche. Le nom est facultatif : sans lui, le point de code est utilisé."
-			)
+			.setName(t("settings.custom.name"))
+			.setDesc(t("settings.custom.desc"))
 			.addButton((button) =>
 				button
-					.setButtonText("Ajouter")
+					.setButtonText(t("settings.custom.add"))
 					.setCta()
 					.onClick(async () => {
 						this.plugin.settings.customChars.push({
@@ -64,7 +80,7 @@ export class SpecialCharSettingTab extends PluginSettingTab {
 				)
 				.addText((text) =>
 					text
-						.setPlaceholder("Nom (facultatif)")
+						.setPlaceholder(t("settings.custom.namePlaceholder"))
 						.setValue(item.label)
 						.onChange(async (value) => {
 							item.label = value;
@@ -74,7 +90,7 @@ export class SpecialCharSettingTab extends PluginSettingTab {
 				.addExtraButton((button) =>
 					button
 						.setIcon("trash")
-						.setTooltip("Supprimer")
+						.setTooltip(t("settings.custom.delete"))
 						.onClick(async () => {
 							this.plugin.settings.customChars.splice(index, 1);
 							await this.plugin.saveSettings();

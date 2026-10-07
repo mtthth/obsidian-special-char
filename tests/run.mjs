@@ -11,6 +11,11 @@ const {
 	normalizeForSearch,
 	matchesQuery,
 	insertSpecialChar,
+	charLabel,
+	groupName,
+	setLanguage,
+	t,
+	LANGUAGES,
 } = plugin;
 
 // Points de code attendus, écrits indépendamment de src/chars.ts (fichier
@@ -34,12 +39,19 @@ check(
 check("aucun caractère en double", new Set(ALL_CHARS.map((c) => c.char)).size, ALL_CHARS.length);
 check("aucun identifiant en double", new Set(ALL_CHARS.map((c) => c.id)).size, ALL_CHARS.length);
 check("aucun libellé en double", new Set(ALL_CHARS.map((c) => c.label)).size, ALL_CHARS.length);
+check("aucun libellé français en double", new Set(ALL_CHARS.map((c) => c.labelFr)).size, ALL_CHARS.length);
+check("chaque caractère a un nom français", ALL_CHARS.filter((c) => !c.labelFr).map((c) => c.id), []);
+check("chaque catégorie a un nom français", CHAR_GROUPS.filter((g) => !g.categoryFr).map((g) => g.category), []);
+check("aucun nom anglais n'est resté en français", ALL_CHARS.filter((c) => c.label === c.labelFr && !["euro", "pi", "copyright", "cent", "franc", "hryvnia", "ligature-fi", "ligature-fl", "ligature-ff", "yen"].includes(c.id)).map((c) => c.id), []);
 check("les deux espaces nommées", [codePointOf(NNBSP), codePointOf(NBSP)], ["202F", "00A0"]);
 
+// La recherche porte sur les noms de la langue active : les tests qui suivent
+// sont écrits avec les noms français, la langue est donc fixée en conséquence.
+setLanguage("fr");
 section("Recherche dans la palette");
 const search = (raw) => {
 	const query = normalizeForSearch(raw.trim());
-	return CHAR_GROUPS.flatMap((group) => group.chars.filter((c) => matchesQuery(c, group.category, query))).map(
+	return CHAR_GROUPS.flatMap((group) => group.chars.filter((c) => matchesQuery(c, groupName(group), query))).map(
 		(c) => c.id
 	);
 };
@@ -86,6 +98,21 @@ check("« ß » trouve l'eszett minuscule et majuscule", search("ß"), ["ss-min"
 check("« ss » trouve l'eszett par son libellé", search("ss").filter((id) => id.startsWith("ss-")), ["ss-min", "ss-maj"]);
 check("« thorn » et « th » trouvent le thorn", search("thorn"), ["thorn-min", "thorn-maj"]);
 
+setLanguage("en");
+section("Search in English");
+// "narrow" contains "arrow": the narrow no-break space is the only other hit.
+check("« arrow » finds the arrows, and nothing else but \"narrow\"", search("arrow").filter((id) => !id.startsWith("fleche-")), ["narrow-nbsp"]);
+check("« arrow » finds all 15 arrows", search("arrow").filter((id) => id.startsWith("fleche-")).length, 15);
+check("« em space » finds only the em space", search("em space"), ["espace-cadratin"]);
+check("« em dash » finds only the em dash", search("em dash"), ["tiret-cadratin"]);
+check("« en dash » finds only the en dash", search("en dash"), ["tiret-demi-cadratin"]);
+check("« quote » finds the whole quotes category", search("quote").length, 10);
+check("« diaeresis » finds the 12 diaeresis letters", search("diaeresis").length, 12);
+check("« cedilla » is accent-insensitive on the typed query", search("CEDILLA"), search("cedilla"));
+check("a French name finds nothing in English", search("flèche"), []);
+check("« eszett » finds both cases", search("eszett"), ["ss-min", "ss-maj"]);
+check("« thorn » finds both cases", search("thorn"), ["thorn-min", "thorn-maj"]);
+check("a single letter still lists its variants", search("e").includes("e-aigu-min"), true);
 
 section("Entourer la sélection");
 const insertInto = (text, a, b, char) => {
@@ -177,28 +204,77 @@ custom.settings.customChars = [];
 check("supprimé, il disparaît des récents sans casser la liste", custom.getRecentChars(), []);
 
 const categories = (instance, hasQuery) =>
-	new plugin.SpecialCharacterModal(instance, new FakeEditor("")).groupsToRender(hasQuery).map((g) => g.category);
+	new plugin.SpecialCharacterModal(instance, new FakeEditor("")).groupsToRender(hasQuery).map((g) => groupName(g));
 
 const vierge = newPlugin();
-check("sans personnalisés ni récents : la liste intégrée seule", categories(vierge, false)[0], "Espaces");
+check("sans personnalisés ni récents : la liste intégrée seule", categories(vierge, false)[0], "Spaces");
 
 const garni = newPlugin();
 garni.settings.customChars = [{ id: "custom-1", char: "≠", label: "Différent de" }];
 check("les personnalisés passent devant la liste intégrée", categories(garni, false).slice(0, 2), [
-	"Personnalisés",
-	"Espaces",
+	"Custom",
+	"Spaces",
 ]);
 
 garni.settings.recentChars = ["custom-1"];
 check("ordre complet : récents, personnalisés, puis le reste", categories(garni, false).slice(0, 3), [
-	"Récents",
-	"Personnalisés",
-	"Espaces",
+	"Recent",
+	"Custom",
+	"Spaces",
 ]);
 check("pendant une recherche, les récents disparaissent mais pas les personnalisés", categories(garni, true).slice(0, 2), [
-	"Personnalisés",
-	"Espaces",
+	"Custom",
+	"Spaces",
 ]);
+setLanguage("fr");
+check("sections en français", categories(garni, false).slice(0, 3), ["Récents", "Personnalisés", "Espaces"]);
+setLanguage("en");
+
+section("Language");
+const names = (instance) => [...instance.commands.values()].map((c) => c.name);
+
+check("the default language is English", plugin.DEFAULT_SETTINGS.language, "en");
+check("two languages are offered", LANGUAGES, ["en", "fr"]);
+check("English name", charLabel(byId("fleche-droite")), "Right arrow");
+setLanguage("fr");
+check("French name", charLabel(byId("fleche-droite")), "Flèche vers la droite");
+check("French category", groupName(CHAR_GROUPS[0]), "Espaces");
+check("a custom character keeps its own name in both languages", charLabel({ id: "c", char: "≠", label: "Mon signe" }), "Mon signe");
+check("French message", t("notice.noEditor"), "Ouvrez d'abord une note pour insérer un caractère spécial.");
+setLanguage("en");
+check("English message", t("notice.noEditor"), "Open a note first to insert a special character.");
+check("message variables", t("command.insert", { label: "Euro" }), "Insert: Euro");
+
+const invalid = newPlugin();
+invalid.loadData = async () => ({ language: "de" });
+await invalid.loadSettings();
+check("an unknown language in data.json falls back to English", invalid.settings.language, "en");
+
+const french = newPlugin();
+french.loadData = async () => ({ language: "fr" });
+await french.loadSettings();
+check("a saved language is restored", french.settings.language, "fr");
+check("and applied at load", t("modal.title"), "Caractères spéciaux");
+setLanguage("en");
+
+const commands = newPlugin();
+commands.registerCommands();
+check("one command per character plus the picker", commands.commands.size, ALL_CHARS.length + 1);
+check("command names are in English by default", [names(commands)[0], names(commands)[1]], [
+	"Insert a special character (picker)",
+	"Insert: Narrow no-break space",
+]);
+commands.settings.language = "fr";
+commands.applyLanguage();
+check("switching language renames the commands", [names(commands)[0], names(commands)[1]], [
+	"Insérer un caractère spécial (fenêtre)",
+	"Insérer : Espace fine insécable",
+]);
+check("without duplicating them", commands.commands.size, ALL_CHARS.length + 1);
+check("ids and default hotkeys are preserved", commands.commands.get("insert-narrow-nbsp").hotkeys.length, 1);
+commands.settings.language = "en";
+commands.applyLanguage();
+check("and back to English", names(commands)[1], "Insert: Narrow no-break space");
 
 section("Cohérence du README");
 const readme = readFileSync(path.join(root, "README.md"), "utf8");
@@ -249,7 +325,7 @@ check(
 );
 check(
 	"les raccourcis annoncés figurent dans le README",
-	["Ctrl + Maj + S", "Ctrl + Maj + 1", "Ctrl + Maj + 2", "Ctrl + Maj + 3", "Ctrl + Maj + 4"].filter(
+	["Ctrl + Shift + S", "Ctrl + Shift + 1", "Ctrl + Shift + 2", "Ctrl + Shift + 3", "Ctrl + Shift + 4"].filter(
 		(key) => !readme.includes(key)
 	),
 	[]

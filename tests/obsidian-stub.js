@@ -3,6 +3,16 @@
 // chargement sont définis ; loadData/saveData permettent d'instancier le
 // plugin pour tester la persistance sans écrire sur le disque.
 export class Plugin {
+	commands = new Map();
+
+	addCommand(command) {
+		this.commands.set(command.id, command);
+	}
+
+	removeCommand(id) {
+		this.commands.delete(id);
+	}
+
 	async loadData() {
 		return null;
 	}
