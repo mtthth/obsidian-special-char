@@ -1,7 +1,7 @@
 {
 	"id": "insert-special-characters",
 	"name": "Insert Special Characters",
-	"version": "1.0.0",
+	"version": "1.1.0",
 	"minAppVersion": "1.7.2",
 	"description": "Quickly insert hard-to-type typographic characters (non-breaking spaces, quotes, accented European letters, ligatures, dashes, arrows…) and make non-breaking spaces visible in the editor.",
 	"author": "Matthieu Thomas (cidrolin)",

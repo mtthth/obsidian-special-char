@@ -1,6 +1,6 @@
 {
 	"name": "obsidian-special-char",
-	"version": "1.0.0",
+	"version": "1.1.0",
 	"description": "Quickly insert hard-to-type typographic characters (non-breaking spaces, quotes, accented European letters, ligatures, dashes, arrows…) and make non-breaking spaces visible in the editor.",
 	"main": "main.js",
 	"scripts": {
