@@ -3,11 +3,50 @@ import { CHAR_GROUPS, CharGroup, SpecialChar, charLabel, codePointLabel, groupNa
 import { t } from "./i18n";
 import type SpecialCharactersPlugin from "../main";
 
+export interface Box {
+	left: number;
+	top: number;
+	width: number;
+}
+
+// Bouton de la ligne voisine, au-dessus (-1) ou en dessous (1), le plus proche
+// horizontalement ; -1 s'il n'y en a pas. Calculé sur les positions à l'écran :
+// le nombre de colonnes dépend de la largeur de la fenêtre, et chaque section
+// de la palette est une grille à part, souvent plus courte que les autres.
+export function verticalNeighbor(boxes: Box[], current: number, direction: 1 | -1): number {
+	const here = boxes[current];
+	// Les boutons d'une même ligne ont le même haut, à l'arrondi près.
+	const TOLERANCE = 2;
+	let rowTop: number | null = null;
+	for (const box of boxes) {
+		const distance = direction * (box.top - here.top);
+		if (distance > TOLERANCE && (rowTop === null || distance < direction * (rowTop - here.top))) {
+			rowTop = box.top;
+		}
+	}
+	if (rowTop === null) {
+		return -1;
+	}
+
+	const centerOf = (box: Box) => box.left + box.width / 2;
+	let best = -1;
+	boxes.forEach((box, index) => {
+		if (
+			Math.abs(box.top - (rowTop as number)) <= TOLERANCE &&
+			(best === -1 || Math.abs(centerOf(box) - centerOf(here)) < Math.abs(centerOf(boxes[best]) - centerOf(here)))
+		) {
+			best = index;
+		}
+	});
+	return best;
+}
+
 export class SpecialCharacterModal extends Modal {
 	private plugin: SpecialCharactersPlugin;
 	private editor: Editor;
-	private searchEl: HTMLInputElement;
-	private resultsEl: HTMLElement;
+	// Créés dans onOpen(), avant tout usage.
+	private searchEl!: HTMLInputElement;
+	private resultsEl!: HTMLElement;
 	private visibleChars: SpecialChar[] = [];
 
 	constructor(plugin: SpecialCharactersPlugin, editor: Editor) {
@@ -114,6 +153,12 @@ export class SpecialCharacterModal extends Modal {
 	}
 
 	private handleSearchKeydown(evt: KeyboardEvent) {
+		// Pendant une saisie par IME (japonais, chinois…), Entrée valide le mot
+		// en cours de composition : elle ne doit rien insérer. Safari signale
+		// ces touches par le keyCode 229 plutôt que par isComposing.
+		if (evt.isComposing || evt.keyCode === 229) {
+			return;
+		}
 		if (evt.key === "Enter") {
 			evt.preventDefault();
 			const first = this.visibleChars[0];
@@ -126,10 +171,13 @@ export class SpecialCharacterModal extends Modal {
 		}
 	}
 
+	// Gauche et droite suivent l'ordre des boutons ; haut et bas changent de
+	// ligne. Remonter depuis la première ligne, ou reculer depuis le premier
+	// bouton, rend le focus au champ de recherche.
 	private handleResultsKeydown(evt: KeyboardEvent) {
-		const forward = evt.key === "ArrowRight" || evt.key === "ArrowDown";
-		const backward = evt.key === "ArrowLeft" || evt.key === "ArrowUp";
-		if (!forward && !backward) {
+		const horizontal = evt.key === "ArrowLeft" || evt.key === "ArrowRight";
+		const vertical = evt.key === "ArrowUp" || evt.key === "ArrowDown";
+		if (!horizontal && !vertical) {
 			return;
 		}
 
@@ -140,10 +188,21 @@ export class SpecialCharacterModal extends Modal {
 		}
 
 		evt.preventDefault();
-		if (backward && current === 0) {
+		if (horizontal) {
+			if (evt.key === "ArrowLeft" && current === 0) {
+				this.searchEl.focus();
+			} else {
+				this.focusButton(current + (evt.key === "ArrowRight" ? 1 : -1));
+			}
+			return;
+		}
+
+		const boxes = buttons.map((button) => button.getBoundingClientRect());
+		const target = verticalNeighbor(boxes, current, evt.key === "ArrowDown" ? 1 : -1);
+		if (target !== -1) {
+			buttons[target].focus();
+		} else if (evt.key === "ArrowUp") {
 			this.searchEl.focus();
-		} else {
-			this.focusButton(current + (forward ? 1 : -1));
 		}
 	}
 

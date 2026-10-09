@@ -20,12 +20,14 @@ By [Matthieu Thomas (cidrolin)](https://github.com/mtthth), under the
 
 Three ways to insert a character:
 
-1. **The picker** — `Ctrl + Shift + S` by default. Type to filter (the search
-   ignores accents and case: "fleche" finds "Flèche" in French, "arrow" finds
-   the arrows in English; a single letter, "e", lists all its variants é è ê ë
-   ě ę…), then `Enter` inserts the first result. The arrow keys move through
-   the grid, `Enter` or `Space` inserts, `Esc` closes. Clicking or tapping
-   works just as well on mobile.
+1. **The picker** — from the ribbon icon, the command palette or a hotkey you
+   assign (see [Hotkeys](#hotkeys)). Type to filter (the search ignores
+   accents and case: "fleche" finds "Flèche" in French, "arrow" finds the
+   arrows in English; a single letter, "e", lists all its variants é è ê ë
+   ě ę…, and "o" also finds ø), then `Enter` inserts the first result. The
+   arrow keys move through the grid (`↑` and `↓` row by row), `Enter` or
+   `Space` inserts, `Esc` closes. Clicking or tapping works just as well on
+   mobile.
 2. **A dedicated command per character** — each of the 303 characters has its
    own command, to which you can assign any hotkey. The last six characters
    inserted, by hotkey or from the picker, reappear in a **Recent** section at
@@ -45,27 +47,30 @@ The search matches the names of the active language.
 
 ## Hotkeys
 
-Four characters have a default hotkey:
+No command has a default hotkey, as Obsidian's plugin guidelines recommend:
+defaults would clash with your own hotkeys and with other plugins. To assign
+one, go to **Settings → Hotkeys** and search for `Insert` — the picker and
+each of the 303 characters have their own row.
 
-| Hotkey | Character |
+A suggested set:
+
+| Hotkey | Command |
 | --- | --- |
-| `Ctrl + Shift + S` | Open the picker |
-| `Ctrl + Shift + 1` | Narrow no-break space |
-| `Ctrl + Shift + 2` | No-break space |
-| `Ctrl + Shift + 3` | French opening quote « |
-| `Ctrl + Shift + 4` | French closing quote » |
+| `Ctrl + Shift + S` | Insert a special character (picker) |
+| `Ctrl + Shift + 1` | Insert: Narrow no-break space |
+| `Ctrl + Shift + 2` | Insert: No-break space |
+| `Ctrl + Shift + 3` | Insert: French opening quote |
+| `Ctrl + Shift + 4` | Insert: French closing quote |
 
-The other 299 characters deliberately have no default hotkey: hundreds of
-defaults would inevitably clash with your other plugins. To assign one, go to
-**Settings → Hotkeys** and search for `Insert:` — every character has its own
-row.
+Versions up to 1.1.0 assigned these by default. After updating, assign them
+again in **Settings → Hotkeys** to keep them (a hotkey you had changed
+yourself is kept).
 
 ### Note for AZERTY keyboards on Windows
 
-The default hotkeys use `Ctrl + Shift`, never `Ctrl + Alt`. On Windows,
-`Ctrl + Alt` is equivalent to `AltGr`, which an AZERTY keyboard needs to type
-`@`, `~`, `#`, `{`, `}`, `[`, `]`, `|`, `\`, the grave accent and `€`. If you
-define your own hotkeys, avoid `Ctrl + Alt` for the same reason.
+Prefer `Ctrl + Shift` to `Ctrl + Alt`. On Windows, `Ctrl + Alt` is equivalent
+to `AltGr`, which an AZERTY keyboard needs to type `@`, `~`, `#`, `{`, `}`,
+`[`, `]`, `|`, `\`, the grave accent and `€`.
 
 ## Wrapping a selection
 

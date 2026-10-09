@@ -1,4 +1,4 @@
-import { Editor, EditorChange, Hotkey } from "obsidian";
+import { Editor, EditorChange } from "obsidian";
 import { getLanguage } from "./i18n";
 
 export interface SpecialChar {
@@ -9,7 +9,6 @@ export interface SpecialChar {
 	labelFr?: string;
 	/** Rendu affiché dans la fenêtre quand le caractère est invisible à l'écran. */
 	preview?: string;
-	hotkey?: Hotkey;
 }
 
 export interface CharGroup {
@@ -28,11 +27,6 @@ export function groupName(group: CharGroup): string {
 	return getLanguage() === "fr" && group.categoryFr ? group.categoryFr : group.category;
 }
 
-// Raccourcis par défaut : toujours Mod+Maj, jamais Mod+Alt. Sous Windows,
-// Ctrl+Alt est équivalent à AltGr, dont un clavier AZERTY a besoin pour saisir
-// @ ~ # { } [ ] | ` \ et €.
-export const hotkey = (key: string): Hotkey => ({ modifiers: ["Mod", "Shift"], key });
-
 // Ces deux constantes contiennent de véritables caractères d'espace, invisibles
 // dans un éditeur de code : les nommer évite d'avoir à les distinguer à l'œil,
 // notamment dans les tests et les décorations de l'éditeur.
@@ -44,8 +38,8 @@ export const CHAR_GROUPS: CharGroup[] = [
 		category: "Spaces",
 		categoryFr: "Espaces",
 		chars: [
-			{ id: "narrow-nbsp", char: NNBSP, label: "Narrow no-break space", labelFr: "Espace fine insécable", preview: `A${NNBSP}B`, hotkey: hotkey("1") },
-			{ id: "nbsp", char: NBSP, label: "No-break space", labelFr: "Espace insécable", preview: `A${NBSP}B`, hotkey: hotkey("2") },
+			{ id: "narrow-nbsp", char: NNBSP, label: "Narrow no-break space", labelFr: "Espace fine insécable", preview: `A${NNBSP}B` },
+			{ id: "nbsp", char: NBSP, label: "No-break space", labelFr: "Espace insécable", preview: `A${NBSP}B` },
 			{ id: "espace-fine", char: "\u2009", label: "Thin space", labelFr: "Espace fine", preview: "A\u2009B" },
 			{ id: "espace-ultrafine", char: "\u200A", label: "Hair space", labelFr: "Espace ultrafine", preview: "A\u200AB" },
 			{ id: "espace-ponctuation", char: "\u2008", label: "Punctuation space", labelFr: "Espace de ponctuation", preview: "A\u2008B" },
@@ -58,8 +52,8 @@ export const CHAR_GROUPS: CharGroup[] = [
 		category: "Quotes and apostrophes",
 		categoryFr: "Guillemets et apostrophes",
 		chars: [
-			{ id: "guillemet-ouvrant", char: "«", label: "French opening quote", labelFr: "Guillemet français ouvrant", hotkey: hotkey("3") },
-			{ id: "guillemet-fermant", char: "»", label: "French closing quote", labelFr: "Guillemet français fermant", hotkey: hotkey("4") },
+			{ id: "guillemet-ouvrant", char: "«", label: "French opening quote", labelFr: "Guillemet français ouvrant" },
+			{ id: "guillemet-fermant", char: "»", label: "French closing quote", labelFr: "Guillemet français fermant" },
 			{ id: "guillemet-simple-ouvrant", char: "‹", label: "French single opening quote", labelFr: "Guillemet français simple ouvrant" },
 			{ id: "guillemet-simple-fermant", char: "›", label: "French single closing quote", labelFr: "Guillemet français simple fermant" },
 			{ id: "guillemet-anglais-ouvrant", char: "“", label: "English opening quote", labelFr: "Guillemet anglais ouvrant" },

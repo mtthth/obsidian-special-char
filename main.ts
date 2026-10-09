@@ -1,6 +1,6 @@
 import { Editor, Notice, Plugin } from "obsidian";
 import { Extension } from "@codemirror/state";
-import { ALL_CHARS, SpecialChar, charLabel, codePointLabel, hotkey, insertSpecialChar } from "./src/chars";
+import { ALL_CHARS, SpecialChar, charLabel, codePointLabel, insertSpecialChar } from "./src/chars";
 import { invisibleSpacesViewPlugin } from "./src/editor-decorations";
 import { setLanguage, t } from "./src/i18n";
 import { SpecialCharacterModal } from "./src/picker-modal";
@@ -8,7 +8,8 @@ import { RECENT_COUNT, SpecialCharPluginSettings, normalizeSettings } from "./sr
 import { SpecialCharSettingTab } from "./src/settings-tab";
 
 export default class SpecialCharactersPlugin extends Plugin {
-	settings: SpecialCharPluginSettings;
+	// Lus dans onload(), avant tout usage.
+	settings!: SpecialCharPluginSettings;
 	// Obsidian conserve une référence sur ce tableau et le relit pour chaque
 	// éditeur, existant comme futur : le modifier puis appeler updateOptions()
 	// est la façon documentée de reconfigurer une extension CodeMirror 6.
@@ -42,20 +43,18 @@ export default class SpecialCharactersPlugin extends Plugin {
 		this.addCommand({
 			id: "open-special-characters-picker",
 			name: t("command.picker"),
-			hotkeys: [hotkey("S")],
 			callback: () => this.openPicker(),
 		});
 		this.commandIds.push("open-special-characters-picker");
 
 		// One command per character: each can get its own hotkey in Settings →
-		// Hotkeys. Only the four most common ones have a default, to avoid the
-		// conflicts that more than 300 imposed hotkeys would cause.
+		// Hotkeys. None has a default: Obsidian's plugin guidelines advise against
+		// them, as they clash with the user's own and with other plugins.
 		for (const item of ALL_CHARS) {
 			const id = `insert-${item.id}`;
 			this.addCommand({
 				id,
 				name: t("command.insert", { label: charLabel(item) }),
-				hotkeys: item.hotkey ? [item.hotkey] : [],
 				editorCallback: (editor: Editor) => {
 					this.insertChar(editor, item);
 				},

@@ -277,6 +277,36 @@ setLanguage("fr");
 check("sections en français", categories(garni, false).slice(0, 3), ["Récents", "Personnalisés", "Espaces"]);
 setLanguage("en");
 
+section("Clavier dans la palette");
+const { verticalNeighbor } = plugin;
+// Deux sections : une grille de 4 colonnes sur deux lignes, dont la seconde
+// n'a que 2 boutons, puis une section d'une seule ligne de 3 boutons. Le titre
+// de section entre les deux décale la troisième ligne vers le bas.
+const box = (left, top) => ({ left, top, width: 100 });
+const grid = [
+	box(0, 0), box(110, 0), box(220, 0), box(330, 0), // 0-3
+	box(0, 70), box(110, 70.5), // 4-5, haut arrondi différemment
+	box(0, 180), box(110, 180), box(220, 180), // 6-8
+];
+check("↓ descend d'une ligne, dans la même colonne", verticalNeighbor(grid, 1, 1), 5);
+check("↓ sur une ligne plus courte : le bouton le plus proche", verticalNeighbor(grid, 3, 1), 5);
+check("↓ passe à la section suivante", verticalNeighbor(grid, 5, 1), 7);
+check("↑ remonte d'une ligne, dans la même colonne", verticalNeighbor(grid, 8, -1), 5);
+check("↑ ignore les boutons de sa propre ligne", verticalNeighbor(grid, 4, -1), 0);
+check("↓ sur la dernière ligne : aucun bouton", verticalNeighbor(grid, 7, 1), -1);
+check("↑ sur la première ligne : aucun bouton", verticalNeighbor(grid, 2, -1), -1);
+
+const palette = new plugin.SpecialCharacterModal(newPlugin(), new FakeEditor(""));
+const inseres = [];
+palette.chooseChar = (item) => inseres.push(item.id);
+palette.visibleChars = [byId("yen")];
+const touche = (props) => palette.handleSearchKeydown({ key: "Enter", preventDefault() {}, ...props });
+touche({ isComposing: true });
+touche({ keyCode: 229 });
+check("Entrée pendant une saisie IME n'insère rien", inseres, []);
+touche({});
+check("Entrée hors IME insère le premier résultat", inseres, ["yen"]);
+
 section("Réglages lus dans data.json");
 const loaded = async (data) => {
 	const instance = newPlugin();
@@ -364,7 +394,8 @@ check("switching language renames the commands", [names(commands)[0], names(comm
 	"Insérer : Espace fine insécable",
 ]);
 check("without duplicating them", commands.commands.size, ALL_CHARS.length + 1);
-check("ids and default hotkeys are preserved", commands.commands.get("insert-narrow-nbsp").hotkeys.length, 1);
+check("ids are preserved", commands.commands.has("insert-narrow-nbsp"), true);
+check("no command has a default hotkey", [...commands.commands.values()].filter((c) => c.hotkeys?.length).map((c) => c.id), []);
 commands.settings.language = "en";
 commands.applyLanguage();
 check("and back to English", names(commands)[1], "Insert: Narrow no-break space");
@@ -410,22 +441,29 @@ check(
 	[licenseText.startsWith("MIT License"), licenseText.includes("Copyright (c) 2026 Matthieu Thomas"), flatReadme.includes("[MIT](LICENSE)")],
 	[true, true, true]
 );
-check("package.json déclare la même licence", JSON.parse(readFileSync(path.join(root, "package.json"), "utf8")).license, "MIT");
 check(
-	"les raccourcis par défaut du code sont ceux annoncés",
-	[...source.matchAll(/hotkey\("([^"]+)"\)/g)].map((m) => m[1]).sort(),
-	["1", "2", "3", "4", "S"]
+	"aucune dépendance en « latest » : le build ne doit pas changer d'un install à l'autre",
+	Object.entries(JSON.parse(readFileSync(path.join(root, "package.json"), "utf8")).devDependencies)
+		.filter(([, version]) => version === "latest")
+		.map(([name]) => name),
+	[]
+);
+check("package.json déclare la même licence", JSON.parse(readFileSync(path.join(root, "package.json"), "utf8")).license, "MIT");
+// Les règles d'Obsidian pour les plugins de la communauté déconseillent les
+// raccourcis par défaut : aucune commande ne doit en déclarer.
+check("aucune commande n'a de raccourci par défaut", source.includes("hotkeys:"), false);
+check(
+	"le README suggère cinq raccourcis",
+	[...readme.matchAll(/^\| `Ctrl \+ Shift \+ \w` \|/gm)].length,
+	5
 );
 check(
-	"les raccourcis annoncés figurent dans le README",
-	["Ctrl + Shift + S", "Ctrl + Shift + 1", "Ctrl + Shift + 2", "Ctrl + Shift + 3", "Ctrl + Shift + 4"].filter(
-		(key) => !readme.includes(key)
+	"les commandes suggérées par le README existent",
+	[...readme.matchAll(/^\| `Ctrl \+ Shift \+ \w` \| (.+?) \|$/gm)].map((m) => m[1]).filter(
+		(name) => !names(commands).includes(name)
 	),
 	[]
 );
-// Ctrl+Alt est AltGr sous Windows : un raccourci par défaut ne doit jamais
-// l'utiliser, sous peine de bloquer la saisie de @ ~ # { } [ ] | et €.
-check("aucun raccourci par défaut n'utilise Mod+Alt", source.includes('"Mod", "Alt"'), false);
 
 section("deploy.ps1");
 // Le script ne tourne que sous Windows : ces vérifications portent sur son
