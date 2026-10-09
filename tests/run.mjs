@@ -113,6 +113,20 @@ check("a French name finds nothing in English", search("flèche"), []);
 check("« eszett » finds both cases", search("eszett"), ["ss-min", "ss-maj"]);
 check("« thorn » finds both cases", search("thorn"), ["thorn-min", "thorn-maj"]);
 check("a single letter still lists its variants", search("e").includes("e-aigu-min"), true);
+check(
+	"a single letter finds its stroked forms",
+	["o", "l", "d", "h", "t"].map((letter) => search(letter).filter((id) => id.endsWith("-barre-min") || id.endsWith("-barre-maj"))),
+	[
+		["o-barre-min", "o-barre-maj"],
+		["l-barre-min", "l-barre-maj"],
+		["d-barre-min", "d-barre-maj"],
+		["h-barre-min", "h-barre-maj"],
+		["t-barre-min", "t-barre-maj"],
+	]
+);
+check("« i » finds the dotless i", search("i").includes("i-sans-point-min"), true);
+check("but « d » does not find the eth, a letter of its own", search("d").includes("eth-min"), false);
+check("« ø » still finds only the stroked o", search("ø"), ["o-barre-min", "o-barre-maj"]);
 
 section("Entourer la sélection");
 const insertInto = (text, a, b, char) => {
@@ -140,6 +154,39 @@ check("un caractère non apparié remplace la sélection", insertInto("abc", 1, 
 const sansSelection = insertInto("ab", 1, 1, "«");
 check("sans sélection : insertion simple", sansSelection.text, "a«b");
 check("sans sélection : curseur après le caractère", sansSelection.cursor, 2);
+
+section("Plusieurs sélections");
+// « un » occupe 0-2, « deux » 3-7 et « trois » 8-13 de « un deux trois ».
+const multi = FakeEditor.withSelections("un deux trois", [[0, 2], [8, 13]], 1);
+insertSpecialChar(multi, "“");
+check("chaque sélection est entourée avec son propre texte", multi.text, "“un” deux “trois”");
+check("chacune reste sélectionnée", multi.selectedTexts(), ["un", "trois"]);
+check("la sélection principale reste la même", multi.getSelection(), "trois");
+check("en un seul pas d'annulation", multi.transactions, 1);
+
+const multiFr = FakeEditor.withSelections("un deux", [[0, 2], [3, 7]]);
+insertSpecialChar(multiFr, "«");
+check("guillemets français sur deux sélections", multiFr.text, `«${NNBSP}un${NNBSP}» «${NNBSP}deux${NNBSP}»`);
+check("les deux textes restent sélectionnés", multiFr.selectedTexts(), ["un", "deux"]);
+
+// Une sélection inversée (tête avant l'ancre) est traitée comme les autres.
+const inversee = FakeEditor.withSelections("un deux", [[2, 0], [7, 3]]);
+insertSpecialChar(inversee, "“");
+check("sélections inversées entourées", inversee.text, "“un” “deux”");
+
+const curseurs = FakeEditor.withSelections("ab\ncd", [[1, 1], [4, 4]], 1);
+insertSpecialChar(curseurs, "→");
+check("plusieurs curseurs : le caractère est inséré à chacun", curseurs.text, "a→b\nc→d");
+check("et chaque curseur passe après lui", curseurs.ranges.map((r) => [r.anchor, r.head]), [[2, 2], [6, 6]]);
+
+const remplace = FakeEditor.withSelections("abcabc", [[1, 2], [4, 5]]);
+insertSpecialChar(remplace, "—");
+check("un caractère non apparié remplace chaque sélection", remplace.text, "a—ca—c");
+
+const mixte = FakeEditor.withSelections("ab cd", [[0, 0], [3, 5]]);
+insertSpecialChar(mixte, "«");
+check("curseur et sélection mêlés", mixte.text, `«ab «${NNBSP}cd${NNBSP}»`);
+check("le curseur avance, la sélection reste sur son texte", mixte.selectedTexts(), ["", "cd"]);
 
 section("Caractères récents");
 // Les réglages du banc d'essai sont copiés des vrais défauts : un réglage
@@ -229,6 +276,52 @@ check("pendant une recherche, les récents disparaissent mais pas les personnali
 setLanguage("fr");
 check("sections en français", categories(garni, false).slice(0, 3), ["Récents", "Personnalisés", "Espaces"]);
 setLanguage("en");
+
+section("Réglages lus dans data.json");
+const loaded = async (data) => {
+	const instance = newPlugin();
+	instance.loadData = async () => data;
+	await instance.loadSettings();
+	return instance.settings;
+};
+
+const sansFichier = await loaded(null);
+check("sans data.json : les réglages par défaut", sansFichier, plugin.DEFAULT_SETTINGS);
+check("dont les tableaux ne sont pas ceux des défauts", [
+	sansFichier.customChars !== plugin.DEFAULT_SETTINGS.customChars,
+	sansFichier.recentChars !== plugin.DEFAULT_SETTINGS.recentChars,
+], [true, true]);
+sansFichier.customChars.push({ id: "custom-x", char: "≠", label: "" });
+check("ajouter un caractère personnalisé ne touche pas les défauts", plugin.DEFAULT_SETTINGS.customChars, []);
+
+const abime = await loaded({
+	showInvisibleSpaces: "false",
+	recentChars: ["yen", 42, null],
+	customChars: [
+		null,
+		"≠",
+		{ id: "custom-1", char: "≠", label: "Différent de" },
+		{ id: "custom-2", char: 7, label: null },
+		{ char: "†" },
+	],
+});
+check("un booléen d'un autre type reprend sa valeur par défaut", abime.showInvisibleSpaces, true);
+check("un vrai booléen est gardé", (await loaded({ showInvisibleSpaces: false })).showInvisibleSpaces, false);
+check("les récents qui ne sont pas des identifiants sont écartés", abime.recentChars, ["yen"]);
+check("les caractères personnalisés qui ne sont pas des objets sont écartés", abime.customChars.length, 3);
+check("une entrée bien formée est gardée telle quelle", abime.customChars[0], {
+	id: "custom-1",
+	char: "≠",
+	label: "Différent de",
+});
+check("un champ texte d'un autre type devient vide", [abime.customChars[1].char, abime.customChars[1].label], ["", ""]);
+check("une entrée sans identifiant en reçoit un", /^custom-/.test(abime.customChars[2].id), true);
+check(
+	"chaque entrée gardée a des champs texte, que l'onglet des réglages peut afficher",
+	abime.customChars.every((c) => ["id", "char", "label"].every((key) => typeof c[key] === "string")),
+	true
+);
+check("une donnée qui n'est pas un objet donne les défauts", await loaded("abîmé"), plugin.DEFAULT_SETTINGS);
 
 section("Language");
 const names = (instance) => [...instance.commands.values()].map((c) => c.name);
@@ -333,6 +426,27 @@ check(
 // Ctrl+Alt est AltGr sous Windows : un raccourci par défaut ne doit jamais
 // l'utiliser, sous peine de bloquer la saisie de @ ~ # { } [ ] | et €.
 check("aucun raccourci par défaut n'utilise Mod+Alt", source.includes('"Mod", "Alt"'), false);
+
+section("deploy.ps1");
+// Le script ne tourne que sous Windows : ces vérifications portent sur son
+// texte.
+const deployBytes = readFileSync(path.join(root, "deploy.ps1"));
+const deploy = deployBytes.toString("utf8");
+const manifestId = JSON.parse(readFileSync(path.join(root, "manifest.json"), "utf8")).id;
+// Sans BOM, Windows PowerShell 5.1 lit le fichier en Windows-1252 : les
+// accents des messages sortent abîmés, et certains octets UTF-8 y deviennent
+// des guillemets typographiques, que PowerShell prend pour des délimiteurs.
+check("deploy.ps1 commence par un BOM UTF-8", [...deployBytes.subarray(0, 3)], [0xef, 0xbb, 0xbf]);
+check(
+	"pas de GetFullPath à deux arguments, absent de Windows PowerShell 5.1",
+	/GetFullPath\([^()]*,/.test(deploy),
+	false
+);
+check(
+	"le dossier par défaut porte l'id du manifeste",
+	deploy.match(/\$VaultPluginPath = "([^"]+)"/)[1].split("\\").pop(),
+	manifestId
+);
 
 section("Classes CSS");
 const styles = readFileSync(path.join(root, "styles.css"), "utf8");

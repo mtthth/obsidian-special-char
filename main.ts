@@ -2,9 +2,9 @@ import { Editor, Notice, Plugin } from "obsidian";
 import { Extension } from "@codemirror/state";
 import { ALL_CHARS, SpecialChar, charLabel, codePointLabel, hotkey, insertSpecialChar } from "./src/chars";
 import { invisibleSpacesViewPlugin } from "./src/editor-decorations";
-import { DEFAULT_LANGUAGE, isLanguage, setLanguage, t } from "./src/i18n";
+import { setLanguage, t } from "./src/i18n";
 import { SpecialCharacterModal } from "./src/picker-modal";
-import { DEFAULT_SETTINGS, RECENT_COUNT, SpecialCharPluginSettings } from "./src/settings";
+import { RECENT_COUNT, SpecialCharPluginSettings, normalizeSettings } from "./src/settings";
 import { SpecialCharSettingTab } from "./src/settings-tab";
 
 export default class SpecialCharactersPlugin extends Plugin {
@@ -82,18 +82,8 @@ export default class SpecialCharactersPlugin extends Plugin {
 	}
 
 	async loadSettings() {
-		this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData());
-		if (!isLanguage(this.settings.language)) {
-			this.settings.language = DEFAULT_LANGUAGE;
-		}
+		this.settings = normalizeSettings(await this.loadData());
 		setLanguage(this.settings.language);
-		// data.json peut avoir été édité à la main ou abîmé par une synchro.
-		if (!Array.isArray(this.settings.recentChars)) {
-			this.settings.recentChars = [];
-		}
-		if (!Array.isArray(this.settings.customChars)) {
-			this.settings.customChars = [];
-		}
 	}
 
 	// Entrées venant de data.json : celles qui sont inutilisables (caractère

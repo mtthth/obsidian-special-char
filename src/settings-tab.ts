@@ -1,5 +1,6 @@
 import { App, PluginSettingTab, Setting } from "obsidian";
 import { LANGUAGES, isLanguage, t } from "./i18n";
+import { newCustomCharId } from "./settings";
 import type SpecialCharactersPlugin from "../main";
 
 export class SpecialCharSettingTab extends PluginSettingTab {
@@ -57,7 +58,7 @@ export class SpecialCharSettingTab extends PluginSettingTab {
 					.setCta()
 					.onClick(async () => {
 						this.plugin.settings.customChars.push({
-							id: `custom-${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`,
+							id: newCustomCharId(),
 							char: "",
 							label: "",
 						});

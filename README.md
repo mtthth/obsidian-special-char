@@ -537,7 +537,11 @@ in **Settings → Insert Special Characters**.
   Obsidian.
 - `deploy.ps1` (Windows/PowerShell): build, then copy `main.js`,
   `manifest.json` and `styles.css` into the vault's plugins folder (path
-  adjustable through the `-VaultPluginPath` parameter).
+  adjustable through the `-VaultPluginPath` parameter). Works with Windows
+  PowerShell 5.1 and PowerShell 7. The destination folder must be named after
+  the plugin id, `insert-special-characters`; if the plugin is already
+  installed under another folder name, the script stops and asks you to rename
+  that folder, which keeps its `data.json`.
 
   If Windows refuses to run it ("running scripts is disabled on this system")
   although `Get-ExecutionPolicy -List` already shows `RemoteSigned` or more

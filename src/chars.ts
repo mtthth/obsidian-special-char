@@ -1,4 +1,4 @@
-import { Editor, Hotkey } from "obsidian";
+import { Editor, EditorChange, Hotkey } from "obsidian";
 import { getLanguage } from "./i18n";
 
 export interface SpecialChar {
@@ -493,6 +493,12 @@ export function normalizeForSearch(text: string): string {
 	return text.normalize("NFD").replace(COMBINING_ACCENTS, "").toLowerCase();
 }
 
+// Lettres barrées que NFD ne décompose pas : sans cette table, « o » ne
+// trouverait pas ø. Seule la barre est ainsi rattachée à sa lettre de base ;
+// ð, þ, ß et les autres sont des lettres à part entière, que l'on cherche par
+// elles-mêmes ou par leur nom.
+const STROKED_BASES: Record<string, string> = { ø: "o", ł: "l", đ: "d", ħ: "h", ŧ: "t", ı: "i" };
+
 export function matchesQuery(item: SpecialChar, category: string, query: string): boolean {
 	if (!query) {
 		return true;
@@ -501,7 +507,8 @@ export function matchesQuery(item: SpecialChar, category: string, query: string)
 	// base : tous les libellés et toutes les catégories en contiennent une, la
 	// recherche par sous-chaîne renverrait la table entière.
 	if (query.length === 1) {
-		return normalizeForSearch(item.char) === query;
+		const char = normalizeForSearch(item.char);
+		return char === query || STROKED_BASES[char] === query;
 	}
 	return (
 		normalizeForSearch(charLabel(item)).includes(query) ||
@@ -529,36 +536,46 @@ const WRAPPING_PAIRS: Record<string, [string, string]> = {
 	"’": ["‘", "’"],
 };
 
-// Entoure la sélection et la laisse sélectionnée, entre les délimiteurs.
-function wrapSelection(editor: Editor, open: string, close: string) {
-	const from = editor.getCursor("from");
-	const to = editor.getCursor("to");
-	const selection = editor.getSelection();
-
-	editor.replaceSelection(open + selection + close);
-
-	// Seule la première ligne de la sélection est décalée par l'insertion de
-	// `open` : sur une sélection multiligne, la position de fin ne bouge pas.
-	editor.setSelection(
-		{ line: from.line, ch: from.ch + open.length },
-		to.line === from.line ? { line: to.line, ch: to.ch + open.length } : to
-	);
-}
-
+// Traite chaque sélection (Alt+clic en pose plusieurs) en une seule
+// transaction, donc un seul pas d'annulation : une sélection non vide est
+// entourée si le caractère est un délimiteur apparié et reste sélectionnée
+// entre les délimiteurs ; sinon le caractère la remplace et le curseur se
+// place après lui.
 export function insertSpecialChar(editor: Editor, char: string) {
 	const pair = WRAPPING_PAIRS[char];
+	const mainHead = editor.posToOffset(editor.getCursor("head"));
+	const ranges = editor
+		.listSelections()
+		.map((sel) => {
+			const anchor = editor.posToOffset(sel.anchor);
+			const head = editor.posToOffset(sel.head);
+			return { from: Math.min(anchor, head), to: Math.max(anchor, head), isMain: head === mainHead };
+		})
+		.sort((a, b) => a.from - b.from);
 
-	if (editor.somethingSelected()) {
-		if (pair) {
-			wrapSelection(editor, pair[0], pair[1]);
+	const changes: EditorChange[] = [];
+	// Positions finales, dans le document modifié : chaque sélection est
+	// décalée de ce qu'ont ajouté ou retiré celles qui la précèdent.
+	const selections: [number, number][] = [];
+	let shift = 0;
+	for (const { from, to } of ranges) {
+		if (pair && from !== to) {
+			const [open, close] = pair;
+			changes.push({ from: editor.offsetToPos(from), text: open }, { from: editor.offsetToPos(to), text: close });
+			selections.push([from + shift + open.length, to + shift + open.length]);
+			shift += open.length + close.length;
 		} else {
-			editor.replaceSelection(char);
+			changes.push({ from: editor.offsetToPos(from), to: editor.offsetToPos(to), text: char });
+			const end = from + shift + char.length;
+			selections.push([end, end]);
+			shift += char.length - (to - from);
 		}
-	} else {
-		const cursor = editor.getCursor();
-		editor.replaceRange(char, cursor);
-		editor.setCursor({ line: cursor.line, ch: cursor.ch + char.length });
 	}
 
+	editor.transaction({ changes });
+	editor.setSelections(
+		selections.map(([anchor, head]) => ({ anchor: editor.offsetToPos(anchor), head: editor.offsetToPos(head) })),
+		Math.max(0, ranges.findIndex((range) => range.isMain))
+	);
 	editor.focus();
 }
