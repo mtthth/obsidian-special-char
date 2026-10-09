@@ -1,4 +1,5 @@
-import { readFileSync, readdirSync } from "fs";
+import { spawnSync } from "child_process";
+import { mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from "fs";
 import path from "path";
 import { FakeEditor, check, loadPlugin, report, root, section } from "./harness.mjs";
 
@@ -127,6 +128,14 @@ check(
 check("« i » finds the dotless i", search("i").includes("i-sans-point-min"), true);
 check("but « d » does not find the eth, a letter of its own", search("d").includes("eth-min"), false);
 check("« ø » still finds only the stroked o", search("ø"), ["o-barre-min", "o-barre-maj"]);
+check("« oe » finds the œ ligature", search("oe"), ["oe-minuscule", "oe-majuscule"]);
+check("« ae » puts the æ ligature first", search("ae").slice(0, 2), ["ae-minuscule", "ae-majuscule"]);
+check("« ij » finds the ĳ ligature", search("ij"), ["ij-minuscule", "ij-majuscule"]);
+check("« nbsp » finds the no-break space alone", search("nbsp"), ["nbsp"]);
+check("« nnbsp » finds the narrow no-break space", search("nnbsp"), ["narrow-nbsp"]);
+setLanguage("fr");
+check("les mots-clés valent aussi en français", [search("oe"), search("nbsp")], [["oe-minuscule", "oe-majuscule"], ["nbsp"]]);
+setLanguage("en");
 
 section("Entourer la sélection");
 const insertInto = (text, a, b, char) => {
@@ -154,6 +163,17 @@ check("un caractère non apparié remplace la sélection", insertInto("abc", 1, 
 const sansSelection = insertInto("ab", 1, 1, "«");
 check("sans sélection : insertion simple", sansSelection.text, "a«b");
 check("sans sélection : curseur après le caractère", sansSelection.cursor, 2);
+
+// Une ligne prise avec son saut de ligne (Maj+↓ depuis le début de ligne,
+// triple clic) : le guillemet fermant doit rester sur la ligne.
+const ligneEntiere = insertInto("ligne\nsuite", 0, 6, "«");
+check("ligne sélectionnée avec son saut de ligne : il reste hors des guillemets", ligneEntiere.text, `«${NNBSP}ligne${NNBSP}»\nsuite`);
+check("et seul le texte reste sélectionné", ligneEntiere.selected, "ligne");
+check("les espaces aux bords restent dehors", insertInto("x bonjour y", 1, 10, "“").text, "x “bonjour” y");
+check("une sélection de blancs seuls est entourée telle quelle", insertInto("a   b", 1, 4, "“").text, "a“   ”b");
+const deuxLignes = FakeEditor.withSelections("un\ndeux\ntrois", [[0, 3], [3, 8]]);
+insertSpecialChar(deuxLignes, "“");
+check("plusieurs lignes sélectionnées une à une", deuxLignes.text, "“un”\n“deux”\ntrois");
 
 section("Plusieurs sélections");
 // « un » occupe 0-2, « deux » 3-7 et « trois » 8-13 de « un deux trois ».
@@ -227,6 +247,25 @@ obsolete.settings.recentChars = ["yen", "caractere-supprime", "livre"];
 check("un identifiant inconnu est ignoré", obsolete.getRecentChars().map((c) => c.id), ["yen", "livre"]);
 check("les récents sont rendus dans l'ordre enregistré", obsolete.getRecentChars()[0].char, "¥");
 
+const elagage = newPlugin();
+elagage.settings.recentChars = ["caractere-supprime", "yen", "livre", "micro", "puce", "division"];
+insert(elagage, "plus-ou-moins");
+check("un identifiant inconnu ne garde pas sa place dans les récents", elagage.settings.recentChars, [
+	"plus-ou-moins",
+	"yen",
+	"livre",
+	"micro",
+	"puce",
+	"division",
+]);
+check("les six places s'affichent", elagage.getRecentChars().length, 6);
+
+const vide = newPlugin();
+vide.settings.customChars = [{ id: "custom-1", char: "", label: "Vidé depuis" }];
+vide.settings.recentChars = ["custom-1"];
+insert(vide, "yen");
+check("un caractère personnalisé vidé quitte les récents à l'insertion suivante", vide.settings.recentChars, ["yen"]);
+
 section("Caractères personnalisés");
 const custom = newPlugin();
 custom.settings.customChars = [
@@ -249,6 +288,17 @@ check("et retrouvé à l'affichage des récents", custom.getRecentChars().map((c
 
 custom.settings.customChars = [];
 check("supprimé, il disparaît des récents sans casser la liste", custom.getRecentChars(), []);
+
+// Deux clics sur la corbeille avant que la liste ne soit redessinée : le
+// second ne doit pas emporter le voisin.
+const corbeille = newPlugin();
+const premier = { id: "custom-1", char: "≠", label: "" };
+const voisin = { id: "custom-2", char: "⇒", label: "" };
+corbeille.settings.customChars = [premier, voisin];
+corbeille.settings.recentChars = ["custom-1", "yen"];
+await Promise.all([corbeille.removeCustomChar(premier), corbeille.removeCustomChar(premier)]);
+check("un double-clic sur la corbeille ne supprime qu'un caractère", corbeille.settings.customChars, [voisin]);
+check("le caractère supprimé quitte aussitôt les récents", corbeille.settings.recentChars, ["yen"]);
 
 const categories = (instance, hasQuery) =>
 	new plugin.SpecialCharacterModal(instance, new FakeEditor("")).groupsToRender(hasQuery).map((g) => groupName(g));
@@ -306,6 +356,58 @@ touche({ keyCode: 229 });
 check("Entrée pendant une saisie IME n'insère rien", inseres, []);
 touche({});
 check("Entrée hors IME insère le premier résultat", inseres, ["yen"]);
+
+section("Enregistrement différé des réglages");
+const frappe = newPlugin();
+const champ = { id: "custom-1", char: "", label: "" };
+frappe.settings.customChars = [champ];
+for (const value of ["≠", "≠≠", "≠"]) frappe.updateCustomChar(champ, { char: value });
+frappe.updateCustomChar(champ, { label: "Différent" });
+check("chaque frappe met le réglage à jour aussitôt", champ, { id: "custom-1", char: "≠", label: "Différent" });
+check("sans écrire data.json à chaque frappe", frappe.saveCount ?? 0, 0);
+frappe.flushSave();
+check("fermer les réglages écrit une seule fois", frappe.saveCount, 1);
+check("avec la dernière valeur", frappe.saved.customChars, [{ id: "custom-1", char: "≠", label: "Différent" }]);
+frappe.flushSave();
+check("rien n'est réécrit s'il n'y a rien en attente", frappe.saveCount, 1);
+
+const delai = newPlugin();
+delai.settings.customChars = [{ id: "custom-1", char: "", label: "" }];
+for (const value of ["a", "ab", "abc"]) delai.updateCustomChar(delai.settings.customChars[0], { char: value });
+await new Promise((resolve) => setTimeout(resolve, 600));
+check("une demi-seconde sans frappe suffit pour une seule écriture", delai.saveCount, 1);
+
+const dechargement = newPlugin();
+dechargement.updateCustomChar({ id: "custom-1", char: "", label: "" }, { char: "≠" });
+dechargement.onunload();
+check("désactiver le plugin écrit ce qui est en attente", dechargement.saveCount, 1);
+
+section("Ouverture de la palette");
+// Simule l'espace de travail : éditeur actif, et mode de la vue Markdown
+// active (null quand ce n'en est pas une, une carte de canvas par exemple).
+const ouvrir = ({ editor = true, mode = "source" } = {}) => {
+	const instance = newPlugin();
+	instance.app = {
+		workspace: {
+			activeEditor: editor ? { editor: new FakeEditor("") } : null,
+			getActiveViewOfType: () => (mode ? { getMode: () => mode } : null),
+		},
+	};
+	const fenetres = plugin.Modal.opened.length;
+	const messages = plugin.Notice.messages.length;
+	instance.openPicker();
+	return { ouverte: plugin.Modal.opened.length > fenetres, messages: plugin.Notice.messages.slice(messages) };
+};
+check("en mode édition, la palette s'ouvre", ouvrir(), { ouverte: true, messages: [] });
+check("en mode Lecture, elle ne s'ouvre pas et dit pourquoi", ouvrir({ mode: "preview" }), {
+	ouverte: false,
+	messages: ["Switch to editing mode to insert a special character."],
+});
+check("hors vue Markdown (carte de canvas), elle s'ouvre", ouvrir({ mode: null }).ouverte, true);
+check("sans éditeur, le message habituel", ouvrir({ editor: false }), {
+	ouverte: false,
+	messages: ["Open a note first to insert a special character."],
+});
 
 section("Réglages lus dans data.json");
 const loaded = async (data) => {
@@ -379,6 +481,26 @@ await french.loadSettings();
 check("a saved language is restored", french.settings.language, "fr");
 check("and applied at load", t("modal.title"), "Caractères spéciaux");
 setLanguage("en");
+
+check(
+	"Obsidian's language mapped to the plugin's",
+	["fr", "fr-CA", "FR", "en", "de", "zh-TW", null, undefined].map(plugin.languageFromLocale),
+	["fr", "fr", "fr", "en", "en", "en", "en", "en"]
+);
+const withAppLanguage = async (appLanguage, data) => {
+	plugin.stubApp.language = appLanguage;
+	const instance = newPlugin();
+	instance.loadData = async () => data;
+	await instance.loadSettings();
+	plugin.stubApp.language = "en";
+	setLanguage("en");
+	return instance.settings.language;
+};
+check("a 1.0 data.json (no language) follows Obsidian in French", await withAppLanguage("fr", { recentChars: ["yen"] }), "fr");
+check("so does a first install", await withAppLanguage("fr", null), "fr");
+check("a language chosen in the settings wins over Obsidian's", await withAppLanguage("fr", { language: "en" }), "en");
+check("an unknown language in data.json falls back to Obsidian's", await withAppLanguage("fr", { language: "de" }), "fr");
+check("an Obsidian language the plugin lacks gives English", await withAppLanguage("de", {}), "en");
 
 const commands = newPlugin();
 commands.registerCommands();
@@ -485,6 +607,54 @@ check(
 	deploy.match(/\$VaultPluginPath = "([^"]+)"/)[1].split("\\").pop(),
 	manifestId
 );
+
+check(
+	"Test-Path, Get-ChildItem et Get-Content prennent les chemins tels quels (-LiteralPath)",
+	[...deploy.matchAll(/\b(Test-Path|Get-ChildItem|Get-Content)\b(?! -LiteralPath)/g)].map((m) => m[0]),
+	[]
+);
+
+// Lancé pour de vrai quand PowerShell est là (pwsh, ou powershell.exe sous
+// Windows ; PWSH peut désigner un autre exécutable), en mode -CheckOnly : ni
+// build ni copie.
+const powershell = [process.env.PWSH, "pwsh", "powershell"]
+	.filter(Boolean)
+	.find((exe) => spawnSync(exe, ["-NoProfile", "-Command", "exit 0"]).status === 0);
+if (!powershell) {
+	console.log("skip  PowerShell absent : deploy.ps1 n'est vérifié que sur son texte");
+} else {
+	const vaults = path.join(root, "tests", ".tmp", "vaults");
+	rmSync(vaults, { recursive: true, force: true });
+	const pluginsOf = (vault) => path.join(vaults, vault, ".obsidian", "plugins");
+	const installed = (vault, folder, manifest) => {
+		mkdirSync(path.join(pluginsOf(vault), folder), { recursive: true });
+		writeFileSync(path.join(pluginsOf(vault), folder, "manifest.json"), manifest);
+	};
+	const checkDestination = (vault, folder = manifestId) => {
+		const result = spawnSync(
+			powershell,
+			["-NoProfile", "-ExecutionPolicy", "Bypass", "-File", path.join(root, "deploy.ps1"), "-VaultPluginPath", path.join(pluginsOf(vault), folder), "-CheckOnly"],
+			{ encoding: "utf8" }
+		);
+		return { status: result.status, output: result.stdout + result.stderr };
+	};
+
+	installed("propre", "autre", '{"id":"autre"}');
+	check("deploy.ps1 : destination libre acceptée", checkDestination("propre").status, 0);
+	check("deploy.ps1 : dossier mal nommé refusé", checkDestination("propre", "obsidian-special-char").status, 1);
+
+	installed("double [perso]", "obsidian-special-char", JSON.stringify({ id: manifestId }));
+	const doublon = checkDestination("double [perso]");
+	check(
+		"deploy.ps1 : copie déjà installée sous un autre nom refusée, même avec des crochets dans le chemin",
+		[doublon.status, doublon.output.includes("obsidian-special-char")],
+		[1, true]
+	);
+
+	installed("abime", "autre", "{ pas du JSON");
+	check("deploy.ps1 : le manifeste illisible d'un autre plugin est ignoré", checkDestination("abime").status, 0);
+	rmSync(vaults, { recursive: true, force: true });
+}
 
 section("Classes CSS");
 const styles = readFileSync(path.join(root, "styles.css"), "utf8");

@@ -9,6 +9,9 @@ export interface SpecialChar {
 	labelFr?: string;
 	/** Rendu affiché dans la fenêtre quand le caractère est invisible à l'écran. */
 	preview?: string;
+	/** Mots-clés de recherche, valables dans les deux langues : transcription
+	 * d'une ligature (« oe »), nom courant (« nbsp »). Trouvés par leur début. */
+	keywords?: string[];
 }
 
 export interface CharGroup {
@@ -38,8 +41,8 @@ export const CHAR_GROUPS: CharGroup[] = [
 		category: "Spaces",
 		categoryFr: "Espaces",
 		chars: [
-			{ id: "narrow-nbsp", char: NNBSP, label: "Narrow no-break space", labelFr: "Espace fine insécable", preview: `A${NNBSP}B` },
-			{ id: "nbsp", char: NBSP, label: "No-break space", labelFr: "Espace insécable", preview: `A${NBSP}B` },
+			{ id: "narrow-nbsp", char: NNBSP, label: "Narrow no-break space", labelFr: "Espace fine insécable", preview: `A${NNBSP}B`, keywords: ["nnbsp"] },
+			{ id: "nbsp", char: NBSP, label: "No-break space", labelFr: "Espace insécable", preview: `A${NBSP}B`, keywords: ["nbsp"] },
 			{ id: "espace-fine", char: "\u2009", label: "Thin space", labelFr: "Espace fine", preview: "A\u2009B" },
 			{ id: "espace-ultrafine", char: "\u200A", label: "Hair space", labelFr: "Espace ultrafine", preview: "A\u200AB" },
 			{ id: "espace-ponctuation", char: "\u2008", label: "Punctuation space", labelFr: "Espace de ponctuation", preview: "A\u2008B" },
@@ -80,12 +83,12 @@ export const CHAR_GROUPS: CharGroup[] = [
 		category: "Ligatures",
 		categoryFr: "Ligatures",
 		chars: [
-			{ id: "oe-minuscule", char: "œ", label: "Lowercase œ ligature", labelFr: "Ligature œ minuscule" },
-			{ id: "oe-majuscule", char: "Œ", label: "Uppercase Œ ligature", labelFr: "Ligature Œ majuscule" },
-			{ id: "ae-minuscule", char: "æ", label: "Lowercase æ ligature", labelFr: "Ligature æ minuscule" },
-			{ id: "ae-majuscule", char: "Æ", label: "Uppercase Æ ligature", labelFr: "Ligature Æ majuscule" },
-			{ id: "ij-minuscule", char: "ĳ", label: "Lowercase ĳ ligature (Dutch)", labelFr: "Ligature ĳ minuscule (néerlandais)" },
-			{ id: "ij-majuscule", char: "Ĳ", label: "Uppercase Ĳ ligature (Dutch)", labelFr: "Ligature Ĳ majuscule (néerlandais)" },
+			{ id: "oe-minuscule", char: "œ", label: "Lowercase œ ligature", labelFr: "Ligature œ minuscule", keywords: ["oe"] },
+			{ id: "oe-majuscule", char: "Œ", label: "Uppercase Œ ligature", labelFr: "Ligature Œ majuscule", keywords: ["oe"] },
+			{ id: "ae-minuscule", char: "æ", label: "Lowercase æ ligature", labelFr: "Ligature æ minuscule", keywords: ["ae"] },
+			{ id: "ae-majuscule", char: "Æ", label: "Uppercase Æ ligature", labelFr: "Ligature Æ majuscule", keywords: ["ae"] },
+			{ id: "ij-minuscule", char: "ĳ", label: "Lowercase ĳ ligature (Dutch)", labelFr: "Ligature ĳ minuscule (néerlandais)", keywords: ["ij"] },
+			{ id: "ij-majuscule", char: "Ĳ", label: "Uppercase Ĳ ligature (Dutch)", labelFr: "Ligature Ĳ majuscule (néerlandais)", keywords: ["ij"] },
 			{ id: "ligature-fi", char: "ﬁ", label: "Ligature fi", labelFr: "Ligature fi" },
 			{ id: "ligature-fl", char: "ﬂ", label: "Ligature fl", labelFr: "Ligature fl" },
 			{ id: "ligature-ff", char: "ﬀ", label: "Ligature ff", labelFr: "Ligature ff" },
@@ -508,7 +511,8 @@ export function matchesQuery(item: SpecialChar, category: string, query: string)
 		normalizeForSearch(charLabel(item)).includes(query) ||
 		normalizeForSearch(category).includes(query) ||
 		normalizeForSearch(item.char).includes(query) ||
-		codePointLabel(item.char).toLowerCase().includes(query)
+		codePointLabel(item.char).toLowerCase().includes(query) ||
+		(item.keywords ?? []).some((keyword) => keyword.startsWith(query))
 	);
 }
 
@@ -529,6 +533,17 @@ const WRAPPING_PAIRS: Record<string, [string, string]> = {
 	"‘": ["‘", "’"],
 	"’": ["‘", "’"],
 };
+
+// Les blancs aux bords d'une sélection restent hors des délimiteurs : une
+// ligne prise avec son saut de ligne (Maj+↓, triple clic) recevrait sinon son
+// guillemet fermant au début de la ligne suivante. Une sélection faite de
+// blancs seulement est entourée telle quelle.
+function trimRange(editor: Editor, from: number, to: number): [number, number] {
+	const text = editor.getRange(editor.offsetToPos(from), editor.offsetToPos(to));
+	const start = from + text.length - text.trimStart().length;
+	const end = to - (text.length - text.trimEnd().length);
+	return start < end ? [start, end] : [from, to];
+}
 
 // Traite chaque sélection (Alt+clic en pose plusieurs) en une seule
 // transaction, donc un seul pas d'annulation : une sélection non vide est
@@ -555,8 +570,9 @@ export function insertSpecialChar(editor: Editor, char: string) {
 	for (const { from, to } of ranges) {
 		if (pair && from !== to) {
 			const [open, close] = pair;
-			changes.push({ from: editor.offsetToPos(from), text: open }, { from: editor.offsetToPos(to), text: close });
-			selections.push([from + shift + open.length, to + shift + open.length]);
+			const [start, end] = trimRange(editor, from, to);
+			changes.push({ from: editor.offsetToPos(start), text: open }, { from: editor.offsetToPos(end), text: close });
+			selections.push([start + shift + open.length, end + shift + open.length]);
 			shift += open.length + close.length;
 		} else {
 			changes.push({ from: editor.offsetToPos(from), to: editor.offsetToPos(to), text: char });

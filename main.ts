@@ -1,11 +1,25 @@
-import { Editor, Notice, Plugin } from "obsidian";
+import { Editor, MarkdownView, Notice, Plugin, debounce, getLanguage } from "obsidian";
 import { Extension } from "@codemirror/state";
 import { ALL_CHARS, SpecialChar, charLabel, codePointLabel, insertSpecialChar } from "./src/chars";
 import { invisibleSpacesViewPlugin } from "./src/editor-decorations";
-import { setLanguage, t } from "./src/i18n";
+import { DEFAULT_LANGUAGE, Language, languageFromLocale, setLanguage, t } from "./src/i18n";
 import { SpecialCharacterModal } from "./src/picker-modal";
-import { RECENT_COUNT, SpecialCharPluginSettings, normalizeSettings } from "./src/settings";
+import { CustomChar, RECENT_COUNT, SpecialCharPluginSettings, normalizeSettings } from "./src/settings";
 import { SpecialCharSettingTab } from "./src/settings-tab";
+
+// Langue de l'interface d'Obsidian. getLanguage() n'existe que depuis
+// Obsidian 1.8.7 ; avant, Obsidian la rangeait dans le localStorage, où elle est
+// absente pour l'anglais.
+function appLanguage(): Language {
+	if (typeof getLanguage === "function") {
+		return languageFromLocale(getLanguage());
+	}
+	try {
+		return languageFromLocale(window.localStorage.getItem("language"));
+	} catch {
+		return DEFAULT_LANGUAGE;
+	}
+}
 
 export default class SpecialCharactersPlugin extends Plugin {
 	// Lus dans onload(), avant tout usage.
@@ -16,6 +30,10 @@ export default class SpecialCharactersPlugin extends Plugin {
 	private editorExtensions: Extension[] = [];
 	private ribbonEl: HTMLElement | null = null;
 	private commandIds: string[] = [];
+	// Enregistrement différé des champs de saisie des réglages : chaque frappe
+	// réécrirait sinon data.json, et un vault synchronisé enverrait chaque
+	// version, au risque de copies en conflit.
+	private pendingSave = debounce(() => void this.saveSettings(), 500, true);
 
 	async onload() {
 		await this.loadSettings();
@@ -29,6 +47,10 @@ export default class SpecialCharactersPlugin extends Plugin {
 			this.openPicker();
 		});
 		this.registerCommands();
+	}
+
+	onunload() {
+		this.flushSave();
 	}
 
 	// Command names are fixed at registration, so a language change removes and
@@ -77,11 +99,17 @@ export default class SpecialCharactersPlugin extends Plugin {
 			new Notice(t("notice.noEditor"));
 			return;
 		}
+		// En mode Lecture, l'éditeur de la note existe toujours, mais caché : y
+		// insérer modifierait le fichier sans que rien ne s'affiche.
+		if (this.app.workspace.getActiveViewOfType(MarkdownView)?.getMode() === "preview") {
+			new Notice(t("notice.readingMode"));
+			return;
+		}
 		new SpecialCharacterModal(this, editor).open();
 	}
 
 	async loadSettings() {
-		this.settings = normalizeSettings(await this.loadData());
+		this.settings = normalizeSettings(await this.loadData(), appLanguage());
 		setLanguage(this.settings.language);
 	}
 
@@ -100,6 +128,34 @@ export default class SpecialCharactersPlugin extends Plugin {
 
 	async saveSettings() {
 		await this.saveData(this.settings);
+	}
+
+	requestSave() {
+		this.pendingSave();
+	}
+
+	// Écrit tout de suite un enregistrement différé encore en attente.
+	flushSave() {
+		this.pendingSave.run();
+	}
+
+	updateCustomChar(item: CustomChar, changes: Partial<Pick<CustomChar, "char" | "label">>) {
+		Object.assign(item, changes);
+		this.requestSave();
+	}
+
+	// L'élément est retrouvé au moment du clic, et non par sa position à
+	// l'affichage : un double-clic sur la corbeille, avant que la liste ne soit
+	// redessinée, supprimerait sinon aussi son voisin. Il quitte les récents,
+	// où il occuperait une place sans s'afficher.
+	async removeCustomChar(item: CustomChar) {
+		const index = this.settings.customChars.indexOf(item);
+		if (index === -1) {
+			return;
+		}
+		this.settings.customChars.splice(index, 1);
+		this.settings.recentChars = this.settings.recentChars.filter((id) => id !== item.id);
+		await this.saveSettings();
 	}
 
 	insertChar(editor: Editor, item: SpecialChar) {
@@ -121,7 +177,14 @@ export default class SpecialCharactersPlugin extends Plugin {
 		if (this.settings.recentChars[0] === id) {
 			return;
 		}
-		this.settings.recentChars = [id, ...this.settings.recentChars.filter((x) => x !== id)].slice(0, RECENT_COUNT);
+		// Les identifiants devenus inconnus (caractère personnalisé supprimé ou
+		// vidé) sont écartés avant de couper la liste : ils y prendraient une
+		// place sans s'afficher.
+		const known = new Set([...this.getCustomChars(), ...ALL_CHARS].map((item) => item.id));
+		this.settings.recentChars = [id, ...this.settings.recentChars.filter((x) => x !== id && known.has(x))].slice(
+			0,
+			RECENT_COUNT
+		);
 		void this.saveSettings();
 	}
 

@@ -11,6 +11,13 @@ export class SpecialCharSettingTab extends PluginSettingTab {
 		this.plugin = plugin;
 	}
 
+	// Les champs de saisie enregistrent en différé : fermer les réglages écrit
+	// ce qui est encore en attente.
+	hide(): void {
+		super.hide();
+		this.plugin.flushSave();
+	}
+
 	display(): void {
 		const { containerEl } = this;
 		containerEl.empty();
@@ -67,37 +74,30 @@ export class SpecialCharSettingTab extends PluginSettingTab {
 					})
 			);
 
-		this.plugin.settings.customChars.forEach((item, index) => {
+		for (const item of this.plugin.settings.customChars) {
 			new Setting(containerEl)
 				.setClass("special-char-custom-row")
 				.addText((text) =>
 					text
 						.setPlaceholder("≠")
 						.setValue(item.char)
-						.onChange(async (value) => {
-							item.char = value;
-							await this.plugin.saveSettings();
-						})
+						.onChange((value) => this.plugin.updateCustomChar(item, { char: value }))
 				)
 				.addText((text) =>
 					text
 						.setPlaceholder(t("settings.custom.namePlaceholder"))
 						.setValue(item.label)
-						.onChange(async (value) => {
-							item.label = value;
-							await this.plugin.saveSettings();
-						})
+						.onChange((value) => this.plugin.updateCustomChar(item, { label: value }))
 				)
 				.addExtraButton((button) =>
 					button
 						.setIcon("trash")
 						.setTooltip(t("settings.custom.delete"))
 						.onClick(async () => {
-							this.plugin.settings.customChars.splice(index, 1);
-							await this.plugin.saveSettings();
+							await this.plugin.removeCustomChar(item);
 							this.display();
 						})
 				);
-		});
+		}
 	}
 }

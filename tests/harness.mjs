@@ -13,6 +13,8 @@ const ENTRY = [
 	`export * from "./src/chars";`,
 	// Le stub de Notice consigne les messages : c'est ce que voit l'utilisateur.
 	`export { Notice } from "obsidian";`,
+	// Commandes du stub : fenêtres ouvertes, langue d'Obsidian.
+	`export { Modal, stubApp } from "obsidian";`,
 	`export * from "./src/i18n";`,
 	`export * from "./src/settings";`,
 	`export * from "./src/editor-decorations";`,
@@ -125,6 +127,10 @@ export class FakeEditor {
 
 	getValue() {
 		return this.text;
+	}
+
+	getRange(from, to) {
+		return this.text.slice(this.offsetAt(from), this.offsetAt(to));
 	}
 
 	posToOffset(pos) {

@@ -30,16 +30,18 @@ export function newCustomCharId(): string {
 
 // Réglages lus dans data.json, qui peut avoir été édité à la main ou abîmé par
 // une synchro : chaque champ d'un type inattendu reprend sa valeur par défaut.
+// Faute de langue enregistrée — c'est le cas de tout data.json de la 1.0, qui
+// n'existait qu'en français —, on prend `appLanguage`, celle d'Obsidian.
 // Les tableaux sont toujours neufs, pour que modifier les réglages ne touche
 // jamais DEFAULT_SETTINGS. Une ligne de caractère personnalisé encore vide est
 // gardée — l'utilisateur la remplira dans les réglages — mais chacune reçoit
 // des champs texte, sans quoi l'onglet des réglages ne pourrait l'afficher.
-export function normalizeSettings(raw: unknown): SpecialCharPluginSettings {
+export function normalizeSettings(raw: unknown, appLanguage: Language = DEFAULT_LANGUAGE): SpecialCharPluginSettings {
 	const data = (typeof raw === "object" && raw !== null ? raw : {}) as Record<string, unknown>;
 	const text = (value: unknown) => (typeof value === "string" ? value : "");
 
 	return {
-		language: isLanguage(data.language) ? data.language : DEFAULT_LANGUAGE,
+		language: isLanguage(data.language) ? data.language : appLanguage,
 		showInvisibleSpaces:
 			typeof data.showInvisibleSpaces === "boolean" ? data.showInvisibleSpaces : DEFAULT_SETTINGS.showInvisibleSpaces,
 		recentChars: Array.isArray(data.recentChars)

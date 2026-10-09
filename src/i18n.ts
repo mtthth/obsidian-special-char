@@ -8,6 +8,7 @@ const EN = {
 	"command.insert": "Insert: {label}",
 	"ribbon.picker": "Insert a special character",
 	"notice.noEditor": "Open a note first to insert a special character.",
+	"notice.readingMode": "Switch to editing mode to insert a special character.",
 
 	"modal.title": "Special characters",
 	"modal.placeholder": "Search (e, ß, em, arrow…)",
@@ -19,7 +20,7 @@ const EN = {
 	"settings.showSpaces.desc":
 		"Highlights the no-break space and narrow no-break space (U+00A0, U+202F) in the editing window, to tell them apart from regular spaces.",
 	"settings.language.name": "Language",
-	"settings.language.desc": "Language of the plugin's messages and of the character names.",
+	"settings.language.desc": "Language of the plugin's messages and of the character names. By default, Obsidian's language.",
 	"settings.language.en": "English",
 	"settings.language.fr": "Français",
 	"settings.custom.name": "Custom characters",
@@ -37,6 +38,7 @@ const FR: Record<StringKey, string> = {
 	"command.insert": "Insérer : {label}",
 	"ribbon.picker": "Insérer un caractère spécial",
 	"notice.noEditor": "Ouvrez d'abord une note pour insérer un caractère spécial.",
+	"notice.readingMode": "Passez en mode édition pour insérer un caractère spécial.",
 
 	"modal.title": "Caractères spéciaux",
 	"modal.placeholder": "Rechercher (e, ß, cadratin, flèche…)",
@@ -48,7 +50,7 @@ const FR: Record<StringKey, string> = {
 	"settings.showSpaces.desc":
 		"Encadre visuellement les espaces insécable et fine insécable (U+00A0, U+202F) dans la fenêtre d'édition, pour les distinguer des espaces normales.",
 	"settings.language.name": "Langue",
-	"settings.language.desc": "Langue des messages du plugin et des noms de caractères.",
+	"settings.language.desc": "Langue des messages du plugin et des noms de caractères. Par défaut, celle d'Obsidian.",
 	"settings.language.en": "English",
 	"settings.language.fr": "Français",
 	"settings.custom.name": "Caractères personnalisés",
@@ -76,6 +78,12 @@ export function getLanguage(): Language {
 
 export function isLanguage(value: unknown): value is Language {
 	return typeof value === "string" && (LANGUAGES as string[]).includes(value);
+}
+
+// Langue d'Obsidian ramenée à celles du plugin : « fr », « fr-CA »… donnent le
+// français, toute autre l'anglais.
+export function languageFromLocale(locale: unknown): Language {
+	return typeof locale === "string" && locale.toLowerCase().split(/[-_]/)[0] === "fr" ? "fr" : "en";
 }
 
 export function t(key: StringKey, vars: Record<string, string> = {}): string {

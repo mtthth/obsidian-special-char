@@ -23,7 +23,16 @@ export class Plugin {
 	}
 }
 
-export class Modal {}
+// Consigne les fenêtres ouvertes : les tests vérifient si la palette s'ouvre.
+export class Modal {
+	static opened = [];
+
+	open() {
+		Modal.opened.push(this);
+	}
+}
+
+export class MarkdownView {}
 export class PluginSettingTab {}
 export class Setting {}
 // Consigne chaque message affiché : les tests vérifient ce que l'utilisateur lit.
@@ -38,3 +47,45 @@ export class Notice {
 }
 
 export const Platform = { isMobile: false };
+
+// Langue d'Obsidian renvoyée par getLanguage() : les tests la fixent.
+export const stubApp = { language: "en" };
+
+export function getLanguage() {
+	return stubApp.language;
+}
+
+// Même contrat que celui d'Obsidian : appel différé de `timeout` ms, délai
+// relancé à chaque appel si `resetTimer`, run() pour exécuter tout de suite un
+// appel en attente, cancel() pour l'annuler.
+export function debounce(cb, timeout = 0, resetTimer = false) {
+	let timer = null;
+	let pendingArgs = [];
+	const fire = () => {
+		timer = null;
+		return cb(...pendingArgs);
+	};
+	const debounced = (...args) => {
+		pendingArgs = args;
+		if (timer && resetTimer) {
+			clearTimeout(timer);
+			timer = null;
+		}
+		if (!timer) {
+			timer = setTimeout(fire, timeout);
+		}
+		return debounced;
+	};
+	debounced.cancel = () => {
+		clearTimeout(timer);
+		timer = null;
+		return debounced;
+	};
+	debounced.run = () => {
+		if (timer) {
+			clearTimeout(timer);
+			return fire();
+		}
+	};
+	return debounced;
+}

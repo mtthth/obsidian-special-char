@@ -7,9 +7,14 @@
     "journal" synchronisé via Google Drive. Le dossier doit porter l'id du
     manifeste (insert-special-characters), comme lors d'une installation
     depuis les plugins de la communauté.
+
+.PARAMETER CheckOnly
+    Vérifie seulement la destination (nom du dossier, copie déjà installée
+    sous un autre nom), sans construire ni copier.
 #>
 param(
-	[string]$VaultPluginPath = "G:\Mon Drive\txt\journal\.obsidian\plugins\insert-special-characters"
+	[string]$VaultPluginPath = "G:\Mon Drive\txt\journal\.obsidian\plugins\insert-special-characters",
+	[switch]$CheckOnly
 )
 
 $ErrorActionPreference = "Stop"
@@ -32,19 +37,38 @@ try {
 	# Obsidian charge un plugin depuis n'importe quel dossier, mais l'installation
 	# depuis la communauté utilise l'id du manifeste : un autre nom de dossier
 	# finirait en deux copies du même plugin, chacune avec son data.json.
-	$pluginId = (Get-Content manifest.json -Raw -Encoding UTF8 | ConvertFrom-Json).id
+	$pluginId = (Get-Content -LiteralPath manifest.json -Raw -Encoding UTF8 | ConvertFrom-Json).id
 	$pluginsDir = Split-Path $VaultPluginPath -Parent
 	if ((Split-Path $VaultPluginPath -Leaf) -ne $pluginId) {
 		throw "Le dossier de destination doit s'appeler $pluginId : $VaultPluginPath"
 	}
-	if (Test-Path $pluginsDir) {
-		foreach ($dir in Get-ChildItem $pluginsDir -Directory) {
+	# -LiteralPath partout : sans lui, des crochets dans le chemin du vault
+	# (« Mon Drive [perso] ») seraient lus comme un motif, et la recherche d'une
+	# copie existante serait sautée sans un mot.
+	if (Test-Path -LiteralPath $pluginsDir) {
+		foreach ($dir in Get-ChildItem -LiteralPath $pluginsDir -Directory) {
 			$otherManifest = Join-Path $dir.FullName "manifest.json"
-			if ($dir.Name -ne $pluginId -and (Test-Path $otherManifest) -and
-				(Get-Content $otherManifest -Raw -Encoding UTF8 | ConvertFrom-Json).id -eq $pluginId) {
+			if ($dir.Name -eq $pluginId -or -not (Test-Path -LiteralPath $otherManifest)) {
+				continue
+			}
+			# Le manifeste illisible d'un autre plugin ne doit pas bloquer le
+			# déploiement : Obsidian ne le chargerait pas non plus.
+			try {
+				$otherId = (Get-Content -LiteralPath $otherManifest -Raw -Encoding UTF8 | ConvertFrom-Json).id
+			}
+			catch {
+				Write-Warning "Manifeste illisible, ignoré : $otherManifest"
+				continue
+			}
+			if ($otherId -eq $pluginId) {
 				throw "Le plugin est déjà installé dans $($dir.FullName). Obsidian fermé, renommez ce dossier en $pluginId (son data.json garde vos réglages), puis relancez."
 			}
 		}
+	}
+
+	if ($CheckOnly) {
+		Write-Host "Destination valide : $VaultPluginPath"
+		return
 	}
 
 	npm run build
@@ -56,9 +80,9 @@ try {
 		throw "npm run build a échoué (code $LASTEXITCODE) : rien n'a été déployé."
 	}
 
-	if (-not (Test-Path $VaultPluginPath)) {
-		New-Item -ItemType Directory -Path $VaultPluginPath -Force | Out-Null
-	}
+	# CreateDirectory prend le chemin tel quel, crochets compris, et ne fait
+	# rien si le dossier existe déjà.
+	[System.IO.Directory]::CreateDirectory($VaultPluginPath) | Out-Null
 
 	Copy-Item main.js, manifest.json, styles.css -Destination $VaultPluginPath -Force
 }

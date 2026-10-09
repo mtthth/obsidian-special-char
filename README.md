@@ -24,10 +24,11 @@ Three ways to insert a character:
    assign (see [Hotkeys](#hotkeys)). Type to filter (the search ignores
    accents and case: "fleche" finds "Flèche" in French, "arrow" finds the
    arrows in English; a single letter, "e", lists all its variants é è ê ë
-   ě ę…, and "o" also finds ø), then `Enter` inserts the first result. The
-   arrow keys move through the grid (`↑` and `↓` row by row), `Enter` or
-   `Space` inserts, `Esc` closes. Clicking or tapping works just as well on
-   mobile.
+   ě ę…, and "o" also finds ø; "oe" finds œ, "nbsp" the no-break space), then
+   `Enter` inserts the first result. The arrow keys move through the grid
+   (`↑` and `↓` row by row), `Enter` or `Space` inserts, `Esc` closes.
+   Clicking or tapping works just as well on mobile. The picker works in
+   editing mode; in Reading view it asks you to switch to editing first.
 2. **A dedicated command per character** — each of the 303 characters has its
    own command, to which you can assign any hotkey. The last six characters
    inserted, by hotkey or from the picker, reappear in a **Recent** section at
@@ -37,9 +38,10 @@ Three ways to insert a character:
 
 ## Language
 
-The interface (messages, settings, command names) and the character names are
-in **English** by default. Switch to **Français** in **Settings → Insert
-Special Characters → Language**. The change applies immediately: the picker,
+The interface (messages, settings, command names) and the character names
+follow **Obsidian's language** by default: French if Obsidian is in French,
+English otherwise. Change it in **Settings → Insert Special Characters →
+Language**. The change applies immediately: the picker,
 the command palette and the settings page all follow. Hotkeys you assigned
 are kept.
 
@@ -85,6 +87,10 @@ no-break spaces.
 | `bonjour` | « or » | « bonjour » |
 | `bonjour` | “ or ” | “bonjour” |
 | `bonjour` | ‘ or ’ | ‘bonjour’ |
+
+Spaces and line breaks at the edges of the selection stay outside: a whole
+line selected with its line break keeps its closing quote on the same line.
+With several selections (`Alt` + click), each one is wrapped.
 
 This applies to hotkeys and to the picker alike. Other characters replace the
 selection, like any keystroke.
@@ -546,7 +552,8 @@ in **Settings → Insert Special Characters**.
   PowerShell 5.1 and PowerShell 7. The destination folder must be named after
   the plugin id, `insert-special-characters`; if the plugin is already
   installed under another folder name, the script stops and asks you to rename
-  that folder, which keeps its `data.json`.
+  that folder, which keeps its `data.json`. `-CheckOnly` runs these checks
+  without building or copying anything.
 
   If Windows refuses to run it ("running scripts is disabled on this system")
   although `Get-ExecutionPolicy -List` already shows `RemoteSigned` or more
